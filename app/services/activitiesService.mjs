@@ -2,18 +2,24 @@ const mockActivities = [
   {
     id: 1,
     name: "Sortie bateau",
-    description: "Sortie en mer sur un bateau à moteur",
-    startDate: "2023-10-01T10:00:00Z",
-    endDate: "2023-10-01T12:00:00Z",
-    users: [1, 2],
+    startDate: "2025-08-01T10:00:00Z",
+    endDate: "2025-08-01T12:00:00Z",
+    users: [1, 2, 3, 4, 5, 6],
   },
   {
     id: 2,
+    name: "Baignade",
+    startDate: "2025-08-01T16:00:00Z",
+    endDate: "2025-08-01T18:00:00Z",
+    users: [1, 2, 3],
+  },
+  {
+    id: 3,
     name: "Beau de provence",
     description: "",
     startDate: "",
     endDate: "",
-    users: [1, 2, 3],
+    users: [1, 2, 3, 4, 5, 6],
   },
 ];
 
@@ -25,14 +31,27 @@ const getTrip = async (id) => {
       {
         id: 1,
         name: "Flo",
+        avatar: "profile.jpg",
       },
       {
         id: 2,
         name: "Julien",
       },
       {
-        id: "3",
+        id: 3,
         name: "Willy",
+      },
+      {
+        id: 4,
+        name: "Alice",
+      },
+      {
+        id: 5,
+        name: "Bob",
+      },
+      {
+        id: 6,
+        name: "Charlie",
       },
     ],
   };
@@ -45,6 +64,7 @@ const toActivity = (activity, trip) => ({
     .map((user) => ({
       id: user.id,
       name: user.name,
+      avatar: user.avatar 
     })),
 });
 
