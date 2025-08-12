@@ -1,0 +1,19 @@
+name: learn-github-actions
+run-name: ${{ github.actor }} is learning GitHub Actions
+on: 
+  push:
+    branches:
+      - main
+  workflow_dispatch:  
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build docker image
+        uses: docker/build-push-actions@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/frecapg7/vakeo-api@latest
+          
+      
