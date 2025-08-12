@@ -12,7 +12,6 @@ jobs:
       - name: Build docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
           push: true
           tags: ghcr.io/frecapg7/vakeo-api:latest
           file: DockerFile
