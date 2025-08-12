@@ -1,0 +1,18 @@
+
+FROM node:latest as build
+WORKDIR /build
+
+# Copy package.json and package-lock.json (if present) for dependency installation
+COPY package.json /build
+
+# Install the dependencies
+RUN npm install --production
+
+# Copy the rest of the application code
+COPY . /build
+
+# Expose the port your app will run on
+EXPOSE 3000
+
+# Start the app
+CMD ["npm", "start"]
