@@ -14,6 +14,6 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/frecapg7/vakeo-api@latest
+          tags: ghcr.io/frecapg7/vakeo-api:latest
           
       
