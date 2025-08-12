@@ -1,16 +1,25 @@
 import express from "express";
 import passport from "./config/passportConfig.mjs";
 import routes from "./app/routes/index.mjs";
-import dotenv from "dotenv";
 import cors from "cors";
-
-dotenv.config();
+import morgan from "morgan";
+import config from "./config.mjs";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(passport.initialize());
+
+
+if(config.environment !== 'development'){
+  console.log("TODO: prepare production environment");
+  app.use(morgan("common"));
+}else{
+  app.use(morgan("dev"));
+}
+
+
 
 app.use(
   "/api",
@@ -20,6 +29,6 @@ app.use(
   routes
 );
 
-app.listen(3000, () => {
-  console.log("Server is running on port 3000");
+app.listen(config.port, () => {
+  console.log(`Server for env : ${config.environment} is now running on port ${config.port}`);
 });
