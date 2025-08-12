@@ -15,5 +15,6 @@ jobs:
           context: .
           push: true
           tags: ghcr.io/frecapg7/vakeo-api:latest
+          file: DockerFile
           
       
