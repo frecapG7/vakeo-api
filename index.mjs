@@ -1,9 +1,10 @@
 import express from "express";
 import passport from "./config/passportConfig.mjs";
-import routes from "./app/routes/index.mjs";
+import routes from "./routes/index.mjs";
 import cors from "cors";
 import morgan from "morgan";
 import config from "./config.mjs";
+import connect from "./config/dbConfig.mjs";
 
 const app = express();
 app.use(cors());
@@ -11,6 +12,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(passport.initialize());
 
+
+
+connect();
 
 if(config.environment !== 'development'){
   console.log("TODO: prepare production environment");

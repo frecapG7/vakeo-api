@@ -1,9 +1,9 @@
 import express from "express";
 import trips from "./trips.mjs";
-import activities from "./activities.mjs";
-import links from "./links.mjs";
-import meals from "./meals.mjs";
-import groceries from "./groceries.mjs";
+import activities from "../app/routes/activities.mjs";
+import links from "../app/routes/links.mjs";
+import meals from "../app/routes/meals.mjs";
+import groceries from "../app/routes/groceries.mjs";
 const app = express();
 
 app.use("/trips", trips);
