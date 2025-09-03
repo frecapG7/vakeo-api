@@ -15,7 +15,8 @@ export default {
         password: process.env.MONGODB_PASSWORD,
         cluster: process.env.MONGODB_CLUSTER,
         dbName: process.env.MONGODB_DBNAME || "test",
-        options: process.env.MONGODB_OPTIONS
+        options: process.env.MONGODB_OPTIONS,
+        debug: process.env.MONGODB_DEBUG || false
     }
 
 
