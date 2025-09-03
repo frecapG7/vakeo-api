@@ -17,7 +17,7 @@ mongoose.connection.on('disconnected', () => {
 
 const connect = async () => {
  try {
-    const uri = `mongodb+srv://${config.db.user}:${config.db.password}@${config.db.cluster}?${config.db.options}`
+    const uri = `mongodb+srv://${config.db.user}:${config.db.password}@${config.db.cluster}/${config.db.dbName}?${config.db.options}`
     await mongoose.connect(uri);
     console.log('MongoDB connected successfully');
   } catch (error) {
