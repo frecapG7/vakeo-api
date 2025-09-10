@@ -1,6 +1,6 @@
 import express from "express";
 import { getTrip, createTrip, deleteTrip } from "../services/tripService.mjs";
-import {  createTripUser, createTripUsers, getTripUserById} from "../services/tripUserService.mjs";
+import { createTripUser, createTripUsers, getTripUserById } from "../services/tripUserService.mjs";
 const app = express();
 
 
@@ -40,6 +40,10 @@ app.put("/:id", async (req, res) => {
 });
 
 
+app.delete("/:id", async (req, res) => {
+  const trip = await deleteTrip(req.params.id);
+  return res.status(200);
+})
 
 app.put("/:id/users", async (req, res) => {
 
@@ -67,10 +71,37 @@ app.put("/:id/users", async (req, res) => {
 
 });
 
-app.delete("/:id", async (req, res) => {
-  const trip = await deleteTrip(req.params.id);
-  return res.status(200);
-})
+
+app.get("/:id/users/:tripUserId", async (req, res) => {
+
+  const trip = await getTrip(req.params.id);
+  if (!trip.users.includes(req.params.tripUserId))
+    throw new Error(`Error accessing trip user: user ${req.params.tripUserId} is no part of the trip ${trip._id}`);
+
+  const user = await getTripUserById(req.params.tripUserId);
+
+  return res.status(200).json(user);
+});
+
+app.put("/:id/users/:tripUserId", async (req, res) => {
+
+
+  const tripUserId = req.params.tripUserId;
+  const trip = await getTrip(req.params.id);
+  if (!trip.users.includes(tripUserId))
+    throw new Error(`Error accessing trip user: user ${tripUserId} is no part of the trip ${trip._id}`);
+
+
+  const user = await getTripUserById(tripUserId);
+
+  const { name, avatar } = req.body;
+  user.name = name;
+  user.avatar = avatar;
+
+  const savedUser = await user.save();
+  return res.status(200).json(savedUser);
+
+});
 
 
 
