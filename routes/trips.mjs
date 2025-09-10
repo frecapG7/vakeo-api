@@ -76,7 +76,7 @@ app.get("/:id/users/:tripUserId", async (req, res) => {
 
   const trip = await getTrip(req.params.id);
   if (!trip.users.includes(req.params.tripUserId))
-    throw new Error(`Cannot update user: user ${req.params.tripUserId} is no part of the trip ${trip._id}`);
+    throw new Error(`Error accessing trip user: user ${req.params.tripUserId} is no part of the trip ${trip._id}`);
 
   const user = await getTripUserById(req.params.tripUserId);
 
@@ -89,7 +89,7 @@ app.put("/:id/users/:tripUserId", async (req, res) => {
   const tripUserId = req.params.tripUserId;
   const trip = await getTrip(req.params.id);
   if (!trip.users.includes(tripUserId))
-    throw new Error(`Cannot update user: user ${tripUserId} is no part of the trip ${trip._id}`);
+    throw new Error(`Error accessing trip user: user ${tripUserId} is no part of the trip ${trip._id}`);
 
 
   const user = await getTripUserById(tripUserId);
