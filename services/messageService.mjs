@@ -10,10 +10,7 @@ export const createMessage = async (trip, {text = "", user}) => {
     return await message.save();
 }
 
-
-
 export const search = async (tripId, cursor, limit) => {
-
      let query = {
         trip: tripId
     };
