@@ -10,7 +10,20 @@ const tripSchema = new mongoose.Schema({
     users: {
         type: [mongoose.Schema.Types.ObjectId],
         ref: "TripUser",
+    },
+    image: {
+        type: String,
+        required: false,
+    },
+    startDate: {
+        type: Date,
+        required: false
+    },
+    endDate: {
+        type: Date,
+        required: false,
     }
+
 }, { timestamps: true });
 
 

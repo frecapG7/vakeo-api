@@ -1,11 +1,7 @@
 import express from "express";
-import { getTrip, createTrip, deleteTrip } from "../services/tripService.mjs";
+import { getTrip, createTrip, deleteTrip, updateTrip } from "../services/tripService.mjs";
 import { createTripUser, createTripUsers, getTripUserById } from "../services/tripUserService.mjs";
 const app = express();
-
-
-
-
 
 app.get("/:id", async (req, res) => {
   const trip = await getTrip(req.params.id);
@@ -21,21 +17,14 @@ app.post("/", async (req, res) => {
     throw new Error("Cannot create trip: a trip must have between 2 and 20 users");
 
   const tripUsers = await createTripUsers(users);
-  const trip = await createTrip(req.body.name, tripUsers);
+  const trip = await createTrip(req.body.name, tripUsers, req.body.image);
   return res.status(201).json(trip);
 });
 
 app.put("/:id", async (req, res) => {
   const trip = await getTrip(req.params.id);
 
-  const { name, startDate, endDate } = req.body;
-
-  trip.name = name;
-  trip.startDate = startDate;
-  trip.endDate = endDate;
-
-  const savedTrip = await trip.save();
-
+  const savedTrip = await updateTrip(trip, req.body);
   return res.status(200).json(savedTrip);
 });
 
