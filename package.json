@@ -6,14 +6,14 @@
   "scripts": {
     "dev": "nodemon index.js",
     "start": "node index.mjs",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/frecapG7/vakeo-api.git"
   },
   "keywords": [],
-  "author": "",
+  "author": "frecapg7",
   "license": "ISC",
   "type": "module",
   "bugs": {
@@ -24,12 +24,14 @@
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
+    "jose": "^6.1.0",
     "mongoose": "^8.18.0",
     "morgan": "^1.10.1",
     "passport": "^0.7.0",
     "passport-headerapikey": "^1.2.2"
   },
   "devDependencies": {
+    "jest": "^30.2.0",
     "nodemon": "^3.1.10"
   }
 }

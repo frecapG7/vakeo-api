@@ -9,6 +9,7 @@ export default {
     api_key: process.env.API_KEY,
 
 
+    token_secret : process.env.TOKEN_SECRET,
 
     db: {
         user: process.env.MONGODB_USER,
