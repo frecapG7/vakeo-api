@@ -2,6 +2,9 @@ import express from "express";
 import trips from "./trips.mjs";
 import messages from "./messages.mjs";
 import tokens from "./tokens.mjs";
+import events from "./events.mjs";
+
+
 import activities from "../app/routes/activities.mjs";
 import links from "../app/routes/links.mjs";
 import meals from "../app/routes/meals.mjs";
@@ -16,5 +19,7 @@ app.use("/trips/:id/meals", meals);
 app.use("/trips/:id/groceries", groceries);
 
 app.use("/token", tokens);
+app.use(events);
+
 
 export default app;
