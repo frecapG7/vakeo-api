@@ -5,6 +5,7 @@ import { createMessage, deleteMessage, search } from "../services/messageService
 
 import express from "express";
 import { getTrip } from "../services/tripService.mjs";
+import { verifyUser } from "../app/services/validationService.mjs";
 const app = express();
 
 
@@ -34,9 +35,7 @@ app.post("/trips/:id/messages", async (req, res) => {
     const trip = await getTrip(req.params.id);
 
     const user = req.body?.user;
-    if (!trip.users.includes(user._id))
-        throw new Error(`Users ${user._id} is not part of trip ${trip._id}`);
-
+    verifyUser(trip, user);
     const savedMessage = await createMessage(trip, req.body); 
     return res.status(201).json();
 });

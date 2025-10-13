@@ -1,6 +1,6 @@
 import Trip from "../models/tripModel.mjs";
 import { InvalidError, NotFoundError } from "../utils/errors.mjs";
-
+import { verifyDates } from "../app/services/validationService.mjs";
 export const getTrip = async (id) => {
     const trip = await Trip.findById(id);
 
@@ -45,18 +45,3 @@ export const deleteTrip = async (id) => {
 }
 
 
-
-const verifyDates = (startDate, endDate) => {
-    const hasStartDate = !!startDate;
-    const hasEndDate = !!endDate;
-
-    if (!hasStartDate && !hasEndDate) return;
-
-    if (hasStartDate !== hasEndDate) {
-        throw new InvalidError("Cannot update startDate or endDate individually: both must be provided or omitted together.");
-    }
-
-    if (startDate > endDate) {
-        throw new InvalidError("Cannot update startDate after endDate");
-    }
-}
