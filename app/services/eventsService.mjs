@@ -9,7 +9,7 @@ export const search = async (tripId, cursor, limit, type, startDate, endDate) =>
     };
 
     if (cursor)
-        query._id = { $lt: cursor };
+        query._id = { $gt: cursor };
     if (type)
         query.type = type;
     if (startDate)
@@ -25,9 +25,6 @@ export const search = async (tripId, cursor, limit, type, startDate, endDate) =>
         }
     };
 
-    console.debug(query);
-    console.debug(options);
-
     const events = await Event.find(query, null, options).populate("owners attendees")
     return events;
 }
@@ -38,7 +35,7 @@ export const getEvent = async (tripId, id) => {
     const event = await Event.findOne({
         _id: id,
         trip: tripId
-    });
+    }).populate("owners attendees");
     if (!event)
         throw new NotFoundError("Cannot find event");
 
