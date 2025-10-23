@@ -10,9 +10,9 @@ app.get("/trips/:tripId/events", async (req, res) => {
 
     const tripId = req.params.tripId;
 
-    const { cursor, limit = 10, type, startDate, endDate } = req.query;
+    const { cursor, limit = 10, type, startDate, endDate, sort } = req.query;
 
-    const events = await search(tripId, cursor, limit, type, startDate, endDate);
+    const events = await search(tripId, cursor, limit, type, startDate, endDate, sort);
 
     const prevCursor = events.length > 0 ? events[0]._id : null;
     const nextCursor = events.length > 0 ? events[events.length - 1]._id : null;
@@ -51,7 +51,22 @@ app.put("/trips/:tripId/events/:id", async (req, res) => {
 
     return res.status(200).json(updatedEvent);
 
-})
+});
+
+
+
+app.delete("/trips/:tripId/events/:id", async (req, res) => {
+
+    const event = await getEvent(req.params.tripId, req.params.id);
+
+    const { user } = req.query;
+
+    if (event?.owners?.filter(u => u._id.equals(user)).length === 0)
+        throw new Error("Forbidden actions");
+
+    await event.deleteOne();
+    return res.status(204).json({});
+});
 
 
 export default app;

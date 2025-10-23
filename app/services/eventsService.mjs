@@ -2,7 +2,7 @@ import Event from "../../models/eventModel.mjs";
 import { NotFoundError } from "../../utils/errors.mjs";
 import { verifyDates, verifyUser } from "./validationService.mjs";
 
-export const search = async (tripId, cursor, limit, type, startDate, endDate) => {
+export const search = async (tripId, cursor, limit, type, startDate, endDate, sort = "createdAt") => {
 
     let query = {
         trip: tripId
@@ -21,7 +21,7 @@ export const search = async (tripId, cursor, limit, type, startDate, endDate) =>
     const options = {
         limit,
         sort: {
-            createdAt: 1
+            [sort]: 1
         }
     };
 
