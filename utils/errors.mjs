@@ -17,3 +17,12 @@ export class InvalidError extends Error {
         this.statusCode = 422
     }
 }
+
+
+export class ForbiddenError extends Error {
+    constructor(message){
+        super(message);
+        this.name = "ForbiddenError";
+        this.statusCode = 401
+    }
+}
