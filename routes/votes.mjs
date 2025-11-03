@@ -2,7 +2,7 @@
 import express from "express";
 import { getTrip } from "../services/tripService.mjs";
 import { closeVote, createVote, getVote, searchVotes, updateVote } from "../app/services/votesService.mjs";
-import { ForbiddenError } from "../utils/errors.mjs";
+import { ForbiddenError, InvalidError } from "../utils/errors.mjs";
 
 
 const app = express();
@@ -10,9 +10,9 @@ const app = express();
 app.get("/trips/:tripId/votes", async (req, res) => {
     const { tripId } = req.params;
 
-    const { limit = 10, cursor, sort } = req.query;
+    const { limit = 10, status, cursor, sort } = req.query;
 
-    const votes = await searchVotes(tripId, limit, cursor, sort);
+    const votes = await searchVotes(tripId, limit, status, cursor, sort);
 
     const prevCursor = votes.length > 0 ? votes[0]._id : null;
     const nextCursor = votes.length > 0 ? votes[votes.length - 1]._id : null;
@@ -38,6 +38,12 @@ app.post("/trips/:tripId/votes", async (req, res) => {
     const trip = await getTrip(tripId);
 
     const vote = req.body;
+
+    // Search for existing open vote
+    const existingVotes = await searchVotes(tripId, 5, "OPEN");
+    if(existingVotes.length > 1)
+        throw new InvalidError("Cannot open a new votes until all previous one are closed");
+
     const newVote = await createVote(trip, vote);
 
     return res.status(201).json(newVote);

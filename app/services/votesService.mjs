@@ -2,7 +2,7 @@ import { DatesVote, Vote } from "../../models/voteModel.mjs"
 import { InvalidError, NotFoundError } from "../../utils/errors.mjs";
 import { verifyDates, verifyUser } from "./validationService.mjs";
 
-export const searchVotes = async (tripId, limit, cursor, sort = "asc") => {
+export const searchVotes = async (tripId, limit, status, cursor, sort = "asc") => {
 
     let query = {
         trip: tripId
@@ -10,6 +10,9 @@ export const searchVotes = async (tripId, limit, cursor, sort = "asc") => {
 
     if (cursor)
         query._id = sort === "asc" ? { $gt: cursor } : { $lt: cursor }
+
+    if (status)
+        query.status = status;
 
     const options = {
         limit,
@@ -33,10 +36,11 @@ export const getVote = async (tripId, voteId) => {
             model: "TripUser"
         }
     }).exec();
-    await vote.populate("createdBy");
     if (!vote)
         throw new NotFoundError("Cannot find vote");
-
+    
+    await vote.populate("createdBy");
+    await vote.populate("voters");
     return vote;
 }
 
@@ -49,7 +53,8 @@ export const createVote = async (trip, vote) => {
         const datesVote = new DatesVote({
             trip,
             createdBy,
-            votes
+            votes,
+            voters: getVoters(votes)
         });
         return await datesVote.save();
     } else {
@@ -57,8 +62,6 @@ export const createVote = async (trip, vote) => {
     }
 
 }
-
-
 
 export const updateVote = async (vote, body) => {
     if (vote.status === "CLOSED")
@@ -69,10 +72,10 @@ export const updateVote = async (vote, body) => {
         votes.forEach(({ startDate, endDate }) => verifyDates(startDate, endDate));
 
     vote.votes = votes;
+    vote.voters = getVoters(votes);
 
     return await vote.save();
 }
-
 
 export const closeVote = async (vote) => {
     if (vote.status === "CLOSED")
@@ -82,4 +85,12 @@ export const closeVote = async (vote) => {
     //TODO: maybe record results of vote so changing attendees size will not affect this closed vote
 
     return await vote.save();
+}
+
+
+
+// ************************************ INTERN METHODS ************************************
+
+const getVoters = (votes) => {
+    return [...new Set(votes.flatMap(vote => vote.users.map(u => u._id)))];
 }

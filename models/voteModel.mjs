@@ -16,6 +16,14 @@ const voteSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "TripUser",
         required: true
+    },
+    voters: {
+        type: [mongoose.Schema.Types.ObjectId],
+        ref: "TripUser",
+        validate: {
+            validator: (v) => v?.length > 0,
+            message: "A votes requires a least one voter"
+        },
     }
 }, {
     discriminatorKey: "type",
