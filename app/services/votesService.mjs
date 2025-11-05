@@ -21,7 +21,7 @@ export const searchVotes = async (tripId, limit, status, cursor, sort = "asc") =
         }
     }
 
-    const votes = await Vote.find(query, null, options).populate("createdBy");
+    const votes = await Vote.find(query, null, options).populate("createdBy voters");
     return votes;
 }
 
@@ -56,7 +56,9 @@ export const createVote = async (trip, vote) => {
             votes,
             voters: getVoters(votes)
         });
-        return await datesVote.save();
+        const newVote = await datesVote.save();
+        await newVote.populate("voters");
+        return newVote;
     } else {
         throw new InvalidError("Unknwon vote type " + type);
     }
@@ -74,7 +76,9 @@ export const updateVote = async (vote, body) => {
     vote.votes = votes;
     vote.voters = getVoters(votes);
 
-    return await vote.save();
+    const updatedVote = await vote.save();
+    await updatedVote.populate("voters")
+    return updatedVote
 }
 
 export const closeVote = async (vote) => {
