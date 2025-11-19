@@ -4,7 +4,7 @@ import messages from "./messages.mjs";
 import tokens from "./tokens.mjs";
 import events from "./events.mjs";
 import votes from "./votes.mjs";
-
+import goods from "./goods.mjs";
 
 import activities from "../app/routes/activities.mjs";
 import links from "../app/routes/links.mjs";
@@ -19,6 +19,7 @@ app.use(messages)
 app.use("/token", tokens);
 app.use(events);
 app.use(votes);
+app.use(goods);
 
 // Deprecated
 app.use("/trips/:id/activities", activities);
