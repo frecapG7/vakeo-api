@@ -2,26 +2,51 @@ import Event from "../../models/eventModel.mjs";
 import { NotFoundError } from "../../utils/errors.mjs";
 import { verifyDates, verifyUser } from "./validationService.mjs";
 
-export const search = async (tripId, cursor, limit, type, startDate, endDate, sort = "createdAt") => {
+export const search = async (tripId, { cursor, limit = 10, type, startDate, endDate }) => {
 
     let query = {
         trip: tripId
     };
 
-    if (cursor)
-        query._id = { $gt: cursor };
+    let lastStartDate;
+    let lastId;
+    if (cursor) {
+        const [cursorId, cursorStartDate] = cursor.split("_");
+        lastId = cursorId;
+        lastStartDate = cursorStartDate;
+    }
     if (type)
         query.type = type;
+
     if (startDate)
         query.startDate = { $gt: startDate }
     if (endDate)
         query.endDate = { $lt: endDate }
 
+    if (lastId) {
+        if (lastStartDate)
+            query.$and = [
+                { startDate: { $ne: null } },
+                {
+                    $or:
+                        [
+
+                            { startDate: { $gt: lastStartDate } },
+                            { startDate: { $eq: startDate }, _id: { $gt: lastId } }
+                        ]
+                }
+            ]
+        else
+            query.$or = [
+                { startDate: { $ne: null } },
+                { startDate: { $eq: null }, _id: { $gt: lastId } }
+            ]
+    }
 
     const options = {
         limit,
         sort: {
-            [sort]: 1
+            startDate: 1
         }
     };
 
