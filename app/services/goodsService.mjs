@@ -13,13 +13,17 @@ export const getGood = async (tripId, goodId) => {
     return good;
 }
 
-export const search = async (tripId, { cursor, limit = 10, event }) => {
+export const search = async (tripId, { search = "", cursor, limit = 10, event }) => {
     let query = {
         trip: tripId
     };
 
     let lastName;
     let lastId;
+
+    if (search)
+        query.name = { $regex: search, $options: "i" };
+
     if (cursor) {
         const [cursorName, cursorId] = cursor.split("_");
         lastName = cursorName;
