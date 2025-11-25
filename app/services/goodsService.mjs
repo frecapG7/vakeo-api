@@ -70,6 +70,27 @@ export const getNames = async (tripId, search = "") => {
 }
 
 
+export const getCount = async (tripId, event) => {
+
+    const query = {
+        trip: tripId,
+        ...(event && { event })
+    };
+
+    const checkedCount = await Good.countDocuments({
+        ...query,
+        checked: true
+    });
+
+    const totalCount = await Good.countDocuments(query);
+
+
+    return {
+        checkedCount,
+        totalCount
+    };
+
+}
 
 export const createGood = async (trip, { name, quantity, createdBy, event }) => {
 
