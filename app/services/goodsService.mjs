@@ -13,13 +13,17 @@ export const getGood = async (tripId, goodId) => {
     return good;
 }
 
-export const search = async (tripId, { cursor, limit = 10, event }) => {
+export const search = async (tripId, { search = "", cursor, limit = 10, event, unchecked = false }) => {
     let query = {
         trip: tripId
     };
 
     let lastName;
     let lastId;
+
+    if (search)
+        query.name = { $regex: search, $options: "i" };
+
     if (cursor) {
         const [cursorName, cursorId] = cursor.split("_");
         lastName = cursorName;
@@ -34,6 +38,9 @@ export const search = async (tripId, { cursor, limit = 10, event }) => {
 
     if (event)
         query.event = event;
+
+    if (unchecked)
+        query.checked = false;
 
     const options = {
         limit,
@@ -66,6 +73,27 @@ export const getNames = async (tripId, search = "") => {
 }
 
 
+export const getCount = async (tripId, event) => {
+
+    const query = {
+        trip: tripId,
+        ...(event && { event })
+    };
+
+    const checkedCount = await Good.countDocuments({
+        ...query,
+        checked: true
+    });
+
+    const totalCount = await Good.countDocuments(query);
+
+
+    return {
+        checkedCount,
+        totalCount
+    };
+
+}
 
 export const createGood = async (trip, { name, quantity, createdBy, event }) => {
 
@@ -82,15 +110,12 @@ export const createGood = async (trip, { name, quantity, createdBy, event }) => 
     return await newGood.save();
 }
 
-
-
 export const updateGood = async (good, { name, quantity }) => {
     if (good?.checked)
         throw new InvalidError("Cannot updated checked good");
 
     good.name = name;
     good.quantity = quantity;
-
     return good.save();
 }
 
