@@ -13,7 +13,7 @@ export const getGood = async (tripId, goodId) => {
     return good;
 }
 
-export const search = async (tripId, { search = "", cursor, limit = 10, event }) => {
+export const search = async (tripId, { search = "", cursor, limit = 10, event, unchecked = false }) => {
     let query = {
         trip: tripId
     };
@@ -38,6 +38,9 @@ export const search = async (tripId, { search = "", cursor, limit = 10, event })
 
     if (event)
         query.event = event;
+
+    if (unchecked)
+        query.checked = false;
 
     const options = {
         limit,
@@ -107,15 +110,12 @@ export const createGood = async (trip, { name, quantity, createdBy, event }) => 
     return await newGood.save();
 }
 
-
-
 export const updateGood = async (good, { name, quantity }) => {
     if (good?.checked)
         throw new InvalidError("Cannot updated checked good");
 
     good.name = name;
     good.quantity = quantity;
-
     return good.save();
 }
 
