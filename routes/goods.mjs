@@ -54,6 +54,17 @@ app.put("/trips/:tripId/goods/:goodId", async (req, res) => {
 });
 
 
+app.delete("/trips/:tripId/goods/:goodId", async (req, res) => {
+    const {tripId, goodId} = req.params;
+
+    const good = await getGood(tripId, goodId);
+    await good.deleteOne();
+
+    return res.status(204).json({});
+
+})
+
+
 app.put("/trips/:tripId/goods/:goodId/checked", async (req, res) => {
     const { tripId, goodId } = req.params;
 
