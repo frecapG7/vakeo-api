@@ -1,6 +1,6 @@
 import express from "express";
 import { getTrip } from "../services/tripService.mjs";
-import { createEvent, getEvent, search, updateEvent } from "../app/services/eventsService.mjs";
+import { createEvent, getEvent, search, updateEvent } from "../services/eventsService.mjs";
 
 
 

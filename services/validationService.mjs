@@ -1,4 +1,4 @@
-import { InvalidError } from "../../utils/errors.mjs";
+import { InvalidError } from "../utils/errors.mjs";
 
 
 export const verifyDates = (startDate, endDate) => {
