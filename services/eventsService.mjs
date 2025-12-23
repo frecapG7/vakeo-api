@@ -1,5 +1,5 @@
-import Event from "../../models/eventModel.mjs";
-import { NotFoundError } from "../../utils/errors.mjs";
+import Event from "../models/eventModel.mjs";
+import { NotFoundError } from "../utils/errors.mjs";
 import { verifyDates, verifyUser } from "./validationService.mjs";
 
 export const search = async (tripId, { cursor, limit = 10, type, startDate, endDate }) => {
@@ -30,7 +30,6 @@ export const search = async (tripId, { cursor, limit = 10, type, startDate, endD
                 {
                     $or:
                         [
-
                             { startDate: { $gt: lastStartDate } },
                             { startDate: { $eq: startDate }, _id: { $gt: lastId } }
                         ]
@@ -68,9 +67,7 @@ export const getEvent = async (tripId, id) => {
 }
 
 
-export const createEvent = async (trip, { name, startDate, endDate, owners, attendees, type }) => {
-
-
+export const createEvent = async (trip, { name, startDate, endDate, owners, attendees, type, details }) => {
 
     verifyDates(startDate, endDate);
     owners?.forEach((owner) => verifyUser(trip, owner));
@@ -83,14 +80,15 @@ export const createEvent = async (trip, { name, startDate, endDate, owners, atte
         endDate,
         owners,
         attendees,
-        type
+        type,
+        details
     });
 
     return await event.save();
 }
 
 
-export const updateEvent = async (event, { name, startDate, endDate, owners, attendees }) => {
+export const updateEvent = async (event, { name, startDate, endDate, owners, attendees, details }) => {
 
 
     await event.populate("trip");
@@ -105,6 +103,7 @@ export const updateEvent = async (event, { name, startDate, endDate, owners, att
     event.endDate = endDate;
     event.owners = owners;
     event.attendees = attendees;
+    event.details = details;
 
     return await event.save();
 }

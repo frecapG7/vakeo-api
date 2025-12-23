@@ -5,7 +5,7 @@ import { createMessage, deleteMessage, search } from "../services/messageService
 
 import express from "express";
 import { getTrip } from "../services/tripService.mjs";
-import { verifyUser } from "../app/services/validationService.mjs";
+import { verifyUser } from "../services/validationService.mjs";
 const app = express();
 
 

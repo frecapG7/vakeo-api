@@ -1,6 +1,6 @@
 import Trip from "../models/tripModel.mjs";
 import { InvalidError, NotFoundError } from "../utils/errors.mjs";
-import { verifyDates } from "../app/services/validationService.mjs";
+import { verifyDates } from "./validationService.mjs";
 export const getTrip = async (id) => {
     const trip = await Trip.findById(id);
 

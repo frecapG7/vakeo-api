@@ -1,7 +1,7 @@
 
 import express from "express";
 import { getTrip } from "../services/tripService.mjs";
-import { checkGood, createGood, getCount, getGood, getNames, search, updateGood } from "../app/services/goodsService.mjs";
+import { checkGood, createGood, getCount, getGood, getNames, search, updateGood } from "../services/goodsService.mjs";
 
 const app = express();
 
