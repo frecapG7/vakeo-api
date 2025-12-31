@@ -45,6 +45,7 @@ export const search = async (tripId, { search = "", cursor, limit = 10, event, u
     const options = {
         limit,
         sort: {
+            checked: 1,
             name: 1
         }
     };
