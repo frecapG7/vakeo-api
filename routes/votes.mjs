@@ -1,7 +1,7 @@
 
 import express from "express";
 import { getTrip } from "../services/tripService.mjs";
-import { closeVote, createVote, getVote, searchVotes, updateVote } from "../app/services/votesService.mjs";
+import { closeVote, createVote, getVote, searchVotes, updateVote } from "../services/votesService.mjs";
 import { ForbiddenError, InvalidError } from "../utils/errors.mjs";
 
 

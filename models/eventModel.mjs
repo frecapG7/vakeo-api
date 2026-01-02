@@ -19,7 +19,6 @@ const eventSchema = new mongoose.Schema({
         ref: "Trip",
         required: true,
     },
-
     owners: {
         type: [mongoose.Schema.Types.ObjectId],
         ref: "TripUser",
@@ -32,6 +31,11 @@ const eventSchema = new mongoose.Schema({
         type: String,
         required: true,
         enum: ["MEAL", "ACTIVITY"]
+    },
+    details: {
+        type: String,
+        required: false,
+        maxLength: 255
     }
 }, { timestamps: true });
 

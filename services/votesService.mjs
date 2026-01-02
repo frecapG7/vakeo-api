@@ -1,5 +1,5 @@
-import { DatesVote, Vote } from "../../models/voteModel.mjs"
-import { InvalidError, NotFoundError } from "../../utils/errors.mjs";
+import { DatesVote, Vote } from "../models/voteModel.mjs"
+import { InvalidError, NotFoundError } from "../utils/errors.mjs";
 import { verifyDates, verifyUser } from "./validationService.mjs";
 
 export const searchVotes = async (tripId, limit, status, cursor, sort = "asc") => {
@@ -38,7 +38,7 @@ export const getVote = async (tripId, voteId) => {
     }).exec();
     if (!vote)
         throw new NotFoundError("Cannot find vote");
-    
+
     await vote.populate("createdBy");
     await vote.populate("voters");
     return vote;
@@ -58,6 +58,7 @@ export const createVote = async (trip, vote) => {
         });
         const newVote = await datesVote.save();
         await newVote.populate("voters");
+        await newVote.populate("createdBy");
         return newVote;
     } else {
         throw new InvalidError("Unknwon vote type " + type);
@@ -78,6 +79,7 @@ export const updateVote = async (vote, body) => {
 
     const updatedVote = await vote.save();
     await updatedVote.populate("voters")
+    await newVote.populate("createdBy");
     return updatedVote
 }
 

@@ -1,5 +1,5 @@
-import Good from "../../models/goodModel.mjs";
-import { InvalidError, NotFoundError } from "../../utils/errors.mjs";
+import Good from "../models/goodModel.mjs";
+import { InvalidError, NotFoundError } from "../utils/errors.mjs";
 import { verifyUser } from "./validationService.mjs";
 
 export const getGood = async (tripId, goodId) => {
