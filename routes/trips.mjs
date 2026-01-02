@@ -85,9 +85,10 @@ app.put("/:id/users/:tripUserId", async (req, res) => {
 
   const user = await getTripUserById(tripUserId);
 
-  const { name, avatar } = req.body;
+  const { name, avatar, restrictions } = req.body;
   user.name = name;
   user.avatar = avatar;
+  user.restrictions = restrictions;
 
   const savedUser = await user.save();
   return res.status(200).json(savedUser);

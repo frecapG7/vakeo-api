@@ -14,6 +14,10 @@ const tripUserSchema = new mongoose.Schema({
     },
     avatar: {
         type: String,
+    },
+    restrictions: {
+        type: [String],
+        required: false
     }
 });
 
