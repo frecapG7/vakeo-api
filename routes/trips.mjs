@@ -1,7 +1,8 @@
 import express from "express";
-import { getTrip, createTrip, deleteTrip, updateTrip } from "../services/tripService.mjs";
+import { getTrip, createTrip, deleteTrip, updateTrip, dashboard } from "../services/tripService.mjs";
 import { createTripUser, createTripUsers, getTripUserById } from "../services/tripUserService.mjs";
 import { generateJWT } from "../services/tokenService.mjs";
+import { verifyUser } from "../services/validationService.mjs";
 
 const app = express();
 
@@ -100,6 +101,21 @@ app.post("/:id/share", async (req, res) => {
   return res.status(200).json({
     value: Buffer.from(jwt, "utf-8").toString('base64url')
   });
+});
+
+
+app.get("/:id/dashboard", async (req, res) => {
+  const trip = await getTrip(req.params.id);
+
+
+  const { user } = req.query;
+
+
+  await verifyUser(trip, { _id: user });
+
+  const result = await dashboard(trip);
+  return res.status(200).json(result);
+
 });
 
 
