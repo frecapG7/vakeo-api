@@ -18,6 +18,7 @@ export const search = async (tripId, { search = "", cursor, limit = 10, event, u
         trip: tripId
     };
 
+    let lastChecked;
     let lastName;
     let lastId;
 
@@ -25,15 +26,18 @@ export const search = async (tripId, { search = "", cursor, limit = 10, event, u
         query.name = { $regex: search, $options: "i" };
 
     if (cursor) {
-        const [cursorName, cursorId] = cursor.split("_");
+        const [cursorChecked, cursorName, cursorId] = cursor.split("_");
+
         lastName = cursorName;
+        lastChecked = cursorChecked === "true";
         lastId = cursorId;
     }
 
     if (lastName && lastId)
         query.$or = [
-            { name: { $gt: lastName } },
-            { name: lastName, _id: { $gt: lastId } }
+            { checked: { $gt: lastChecked } },
+            { checked: lastChecked, name: { $gt: lastName } },
+            { checked: lastChecked, name: lastName, _id: { $gt: lastId } }
         ];
 
     if (event)
