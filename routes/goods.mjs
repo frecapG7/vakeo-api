@@ -79,7 +79,7 @@ app.put("/trips/:tripId/goods/:goodId/checked", async (req, res) => {
  * **************************************************************
  */
 const buidCursor = (good) => {
-    return `${good.name}_${good._id}`;
+    return `${good.checked}_${good.name}_${good._id}`;
 }
 
 export default app;
