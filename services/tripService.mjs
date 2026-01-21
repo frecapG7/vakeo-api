@@ -2,9 +2,30 @@ import Trip from "../models/tripModel.mjs";
 import { Vote } from "../models/voteModel.mjs";
 import Good from "../models/goodModel.mjs";
 import Event from "../models/eventModel.mjs";
-import { InvalidError, NotFoundError } from "../utils/errors.mjs";
+import {NotFoundError } from "../utils/errors.mjs";
 import { verifyDates } from "./validationService.mjs";
 
+export const search = async ({ ids }) => {
+
+    console.debug(JSON.stringify(ids));
+    if (!ids)
+        return [];
+
+    const searchIds = ids.split(",");
+
+    const trips = await Trip.find({
+        _id: { $in: searchIds }
+    }, "users name image createdAt", {
+        limit: 20,
+        sort: {
+            createdAt: -1
+        }
+    })
+    .populate("users", "avatar name");
+
+    return trips;
+
+}
 
 export const getTrip = async (id) => {
     const trip = await Trip.findById(id);

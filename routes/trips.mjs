@@ -1,10 +1,16 @@
 import express from "express";
-import { getTrip, createTrip, deleteTrip, updateTrip, dashboard } from "../services/tripService.mjs";
+import { getTrip, createTrip, deleteTrip, updateTrip, dashboard, search } from "../services/tripService.mjs";
 import { createTripUser, createTripUsers, getTripUserById } from "../services/tripUserService.mjs";
 import { generateJWT } from "../services/tokenService.mjs";
 import { verifyUser } from "../services/validationService.mjs";
 
 const app = express();
+
+app.get("/", async (req, res) => {
+
+  const trips = await search(req.query);
+  return res.status(200).json(trips);
+});
 
 app.get("/:id", async (req, res) => {
   const trip = await getTrip(req.params.id);
