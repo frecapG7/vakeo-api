@@ -7,7 +7,6 @@ import { verifyDates } from "./validationService.mjs";
 
 export const search = async ({ ids }) => {
 
-    console.debug(JSON.stringify(ids));
     if (!ids)
         return [];
 
