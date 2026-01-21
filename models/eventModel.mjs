@@ -30,7 +30,7 @@ const eventSchema = new mongoose.Schema({
     type: {
         type: String,
         required: true,
-        enum: ["MEAL", "ACTIVITY"]
+        enum: ["MEAL", "RESTAURANT", "SPORT", "PARTY", "VISITATION",  "ACTIVITY", "OTHER"]
     },
     details: {
         type: String,
