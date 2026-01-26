@@ -2,7 +2,7 @@ import Event from "../models/eventModel.mjs";
 import { NotFoundError } from "../utils/errors.mjs";
 import { verifyDates, verifyUser } from "./validationService.mjs";
 
-export const search = async (tripId, { cursor, limit = 10, type, startDate, endDate }) => {
+export const search = async (tripId, { cursor, limit = 10, type, startDate, endDate, attendee, owner, search }) => {
 
     let query = {
         trip: tripId
@@ -22,6 +22,12 @@ export const search = async (tripId, { cursor, limit = 10, type, startDate, endD
         query.startDate = { $gt: startDate }
     if (endDate)
         query.endDate = { $lt: endDate }
+    if (attendee)
+        query.attendees = attendee
+    if (owner)
+        query.owners = owner;
+    if (search)
+        query.name = { $regex: search, $options: "i" };
 
     if (lastId) {
         if (lastStartDate)
