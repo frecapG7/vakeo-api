@@ -21,7 +21,7 @@ export const search = async ({ ids, search }) => {
 
     const trips = await Trip.find(
         query,
-        "users name image createdAt", {
+        "users name image startDate endDate createdAt", {
         limit: 20,
         sort: {
             createdAt: -1
