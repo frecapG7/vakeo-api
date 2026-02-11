@@ -4,7 +4,8 @@ const voteSchema = new mongoose.Schema({
     trip: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Trip",
-        required: true
+        required: true,
+        index: true
     },
     status: {
         type: String,
@@ -24,7 +25,8 @@ const voteSchema = new mongoose.Schema({
             validator: (v) => v?.length > 0,
             message: "A votes requires a least one voter"
         },
-    }
+    },
+    
 }, {
     discriminatorKey: "type",
     timestamps: true
