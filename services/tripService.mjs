@@ -1,5 +1,5 @@
 import Trip from "../models/tripModel.mjs";
-import { Vote } from "../models/voteModel.mjs";
+import { Poll } from "../models/pollModel.mjs";
 import Good from "../models/goodModel.mjs";
 import Event from "../models/eventModel.mjs";
 import { NotFoundError } from "../utils/errors.mjs";
@@ -108,11 +108,11 @@ export const dashboard = async (trip, user) => {
 
 const polls = async (trip) => {
 
-    const pending = await Vote.countDocuments({
+    const pending = await Poll.countDocuments({
         trip,
-        status: "OPEN"
+        isClosed: false
     });
-    const total = await Vote.countDocuments({
+    const total = await Poll.countDocuments({
         trip,
     });
 
