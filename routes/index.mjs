@@ -6,6 +6,7 @@ import events from "./events.mjs";
 import votes from "./votes.mjs";
 import goods from "./goods.mjs";
 import polls from "./polls.mjs";
+import linkPreview from "./link-preview.mjs";
 const app = express();
 
 app.use("/trips", trips);
@@ -20,7 +21,7 @@ app.use(goods);
 app.use(polls);
 //Deprecated
 app.use(votes);
-
+app.use(linkPreview);
 
 
 export default app;
