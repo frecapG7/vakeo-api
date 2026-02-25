@@ -1,7 +1,7 @@
 
 import express from "express";
 import { getTrip } from "../services/tripService.mjs";
-import { checkGood, createGood, getCount, getGood, getNames, search, updateGood } from "../services/goodsService.mjs";
+import { checkGood, createGood, getCount, getGood, getNames, getSummary, search,  updateGood } from "../services/goodsService.mjs";
 
 const app = express();
 
@@ -18,6 +18,12 @@ app.get("/trips/:tripId/goods", async (req, res) => {
         totalResults: goods.length,
         goods
     });
+});
+
+
+app.get("/trips/:tripId/goods/summary", async (req, res) => {
+    const summary = await getSummary(req)
+    return res.status(200).json(summary);
 });
 
 app.get("/trips/:tripId/goods/names", async (req, res) => {
