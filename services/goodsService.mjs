@@ -59,6 +59,32 @@ export const search = async (tripId, { search = "", cursor, limit = 10, event, u
 }
 
 
+
+export const getSummary = async ({ params: { tripId }, query: {event}, }) => {
+    const baseQuery = {
+        trip: tripId,
+        event,
+    }
+
+    const totalCount = await Good.countDocuments(baseQuery);
+    const checkedCount = await Good.countDocuments({
+        ...baseQuery,
+        checked: true
+    });
+    const goods = await Good.find(baseQuery, null, {
+        limit: 4,
+    });
+
+
+    return {
+        totalCount,
+        checkedCount,
+        goods
+    }
+
+
+}
+
 export const getNames = async (tripId, search = "") => {
 
     const query = {
