@@ -128,6 +128,7 @@ export const votePoll = async (trip, pollId, { options, user }) => {
             model: "TripUser"
         }
     });
+
     return newPoll;
 }
 
@@ -157,6 +158,8 @@ export const unvotePoll = async (trip, pollId, optionId, userId) => {
             model: "TripUser"
         }
     });
+    await newPoll.populate("createdBy");
+
     return newPoll;
 }
 
@@ -186,7 +189,5 @@ export const deletePoll = async (tripId, pollId, userId) => {
         }
     });
     return newPoll;
-
-
 }
 

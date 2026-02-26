@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { isValidUrl } from "../utils/validator.mjs";
 
 
 const pollSchema = new mongoose.Schema({
@@ -40,14 +41,11 @@ const pollSchema = new mongoose.Schema({
     }
 );
 
-
-
-pollSchema.pre("save", async function (next) {
+pollSchema.pre("save", async function () {
     const allSelectedUsers = this.options.flatMap(
         option => option.selectedBy
     );
     this.hasSelected = [...new Set(allSelectedUsers)];
-    next();
 });
 export const Poll = mongoose.model("Poll", pollSchema);
 
@@ -84,7 +82,13 @@ export const HousingPoll = Poll.discriminator("HousingPoll", new mongoose.Schema
                 },
                 value: {
                     type: String,
-                    required: true
+                    required: true,
+                    validate: {
+                        validator: function(v) {
+                            return isValidUrl(v);
+                        },
+                        message: props => `${props.value} is not a valid url`
+                    }
                 },
                 selectedBy: [{
                     type: mongoose.Schema.Types.ObjectId,
