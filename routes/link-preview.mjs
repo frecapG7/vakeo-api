@@ -1,19 +1,9 @@
-
-
-
-
-
 import express from "express";
 import { getLinkPreview } from "link-preview-js";
 import dns from "node:dns";
 import { isValidUrl } from "../utils/validator.mjs";
 
-
-
-
 const app = express();
-
-
 
 app.post("/link-preview", async (req, res) => {
     try {
@@ -29,7 +19,6 @@ app.post("/link-preview", async (req, res) => {
             resolveDNSHost: async (url) => {
                 return new Promise((resolve, reject) => {
                     const hostname = new URL(url).hostname;
-                    console.log(hostname);
                     dns.lookup(hostname, (err, address, family) => {
                         if (err) {
                             console.warn(err);
@@ -39,7 +28,21 @@ app.post("/link-preview", async (req, res) => {
                         resolve(address);
                     })
                 })
-            }
+            },
+            followRedirects: `manual`,
+            handleRedirects: (baseURL, forwardedURL) => {
+                const urlObj = new URL(baseURL);
+                const forwardedURLObj = new URL(forwardedURL);
+                if (
+                    forwardedURLObj.hostname === urlObj.hostname ||
+                    forwardedURLObj.hostname === "www." + urlObj.hostname ||
+                    "www." + forwardedURLObj.hostname === urlObj.hostname
+                ) {
+                    return true;
+                } else {
+                    return false;
+                }
+            },
         });
         return res.status(200).json(preview);
 
