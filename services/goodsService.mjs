@@ -60,7 +60,7 @@ export const search = async (tripId, { search = "", cursor, limit = 10, event, u
 
 
 
-export const getSummary = async ({ params: { tripId }, event, }) => {
+export const getSummary = async ({ params: { tripId }, query: {event}, }) => {
     const baseQuery = {
         trip: tripId,
         event,
