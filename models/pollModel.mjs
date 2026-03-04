@@ -1,6 +1,15 @@
 import mongoose from "mongoose";
 import { isValidUrl } from "../utils/validator.mjs";
 
+const optionSchema = new mongoose.Schema({
+    selectedBy: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "TripUser"
+    }]
+}, {
+    toJSON: {virtuals: true}
+});
+
 
 const pollSchema = new mongoose.Schema({
     question: {
@@ -33,13 +42,22 @@ const pollSchema = new mongoose.Schema({
     hasSelected: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: "TripUser"
-    }]
+    }],
+    options: [optionSchema]
 },
     {
         discriminatorKey: "type",
-        timestamps: true
+        timestamps: true,
+        toJSON: { virtuals: true }
     }
 );
+
+// Virtual pour le calcul du pourcentage
+optionSchema.virtual('percent').get(function() {
+    const selectedCount = this.selectedBy?.length || 0;
+    const totalSelected = this.parent().hasSelected?.length || 1; // Évite la division par zéro
+    return (selectedCount / totalSelected) * 100;
+});
 
 pollSchema.pre("save", async function () {
     const allSelectedUsers = this.options.flatMap(
@@ -47,6 +65,8 @@ pollSchema.pre("save", async function () {
     );
     this.hasSelected = [...new Set(allSelectedUsers)];
 });
+
+
 export const Poll = mongoose.model("Poll", pollSchema);
 
 export const DatesPoll = Poll.discriminator("DatesPoll", new mongoose.Schema({
@@ -70,8 +90,6 @@ export const DatesPoll = Poll.discriminator("DatesPoll", new mongoose.Schema({
     }
 }));
 
-
-
 export const HousingPoll = Poll.discriminator("HousingPoll", new mongoose.Schema({
     options: {
         type: [
@@ -80,15 +98,23 @@ export const HousingPoll = Poll.discriminator("HousingPoll", new mongoose.Schema
                     type: String,
                     required: true
                 },
-                value: {
+                url: {
                     type: String,
                     required: true,
                     validate: {
-                        validator: function(v) {
+                        validator: function (v) {
                             return isValidUrl(v);
                         },
                         message: props => `${props.value} is not a valid url`
                     }
+                },
+                image: {
+                    type: String,
+                    required: false
+                },
+                icon: {
+                    type: String,
+                    required: false,
                 },
                 selectedBy: [{
                     type: mongoose.Schema.Types.ObjectId,
