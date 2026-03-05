@@ -56,12 +56,13 @@ const pollSchema = new mongoose.Schema({
 optionSchema.virtual('percent').get(function() {
     const selectedCount = this.selectedBy?.length || 0;
     const totalSelected = this.parent().hasSelected?.length || 1; // Évite la division par zéro
-    return (selectedCount / totalSelected) * 100;
+    const percent =  (selectedCount / totalSelected) * 100;
+    return Number(percent).toFixed(2);
 });
 
 pollSchema.pre("save", async function () {
     const allSelectedUsers = this.options.flatMap(
-        option => option.selectedBy
+        option => option.selectedBy.toString()
     );
     this.hasSelected = [...new Set(allSelectedUsers)];
 });

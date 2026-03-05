@@ -69,4 +69,5 @@ app.delete("/trips/:tripId/polls/:pollId/vote/:optionsId", async (req, res) => {
 
 });
 
+
 export default app;
