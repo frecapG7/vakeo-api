@@ -91,8 +91,6 @@ export const createPoll = async (trip, poll) => {
     return savedPoll;
 }
 
-
-
 export const votePoll = async (trip, pollId, { options, user }) => {
 
     const poll = await Poll.findOne({
@@ -128,11 +126,10 @@ export const votePoll = async (trip, pollId, { options, user }) => {
             model: "TripUser"
         }
     });
+    await newPoll.populate("createdBy");
 
     return newPoll;
 }
-
-
 
 export const unvotePoll = async (trip, pollId, optionId, userId) => {
 
@@ -162,9 +159,6 @@ export const unvotePoll = async (trip, pollId, optionId, userId) => {
 
     return newPoll;
 }
-
-
-
 
 export const deletePoll = async (tripId, pollId, userId) => {
 
