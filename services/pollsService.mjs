@@ -5,15 +5,17 @@ import { verifyDates, verifyUser } from "./validationService.mjs";
 
 
 
-export const searchPolls = async (tripId, { limit, cursor, sort = "asc" }) => {
+export const searchPolls = async (tripId, { limit, cursor, sort = "asc", excludeClosed = false }) => {
 
     let query = {
-        trip: tripId
+        trip: tripId,
+        ...(excludeClosed && {isClosed: false})
     };
 
     if (cursor)
         query._id = sort === "asc" ? { $gt: cursor } : { $lt: cursor }
 
+    
     const options = {
         limit,
         sort: {
@@ -21,7 +23,7 @@ export const searchPolls = async (tripId, { limit, cursor, sort = "asc" }) => {
         }
     }
 
-    const polls = await Poll.find(query, null, options).populate("createdBy voters");
+    const polls = await Poll.find(query, null, options).populate("createdBy hasSelected options.selectedBy");
     return polls;
 }
 
