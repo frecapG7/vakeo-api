@@ -5,17 +5,21 @@ import { verifyDates, verifyUser } from "./validationService.mjs";
 
 
 
-export const searchPolls = async (tripId, { limit, cursor, sort = "asc", excludeClosed = false }) => {
+export const searchPolls = async (tripId, { limit, cursor, sort = "asc", type, excludeClosed = false, excludeSelectedBy }) => {
 
     let query = {
         trip: tripId,
-        ...(excludeClosed && {isClosed: false})
+        ...(excludeClosed && { isClosed: false })
     };
 
     if (cursor)
         query._id = sort === "asc" ? { $gt: cursor } : { $lt: cursor }
 
-    
+    if (type)
+        query.type = type;
+    if (excludeSelectedBy)
+        query.hasSelected = { $nin: [excludeSelectedBy] }
+
     const options = {
         limit,
         sort: {

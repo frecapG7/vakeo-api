@@ -34,6 +34,7 @@ app.put("/:id", async (req, res) => {
   const trip = await getTrip(req.params.id);
 
   const savedTrip = await updateTrip(trip, req.body);
+  await savedTrip.populate("users");
   return res.status(200).json(savedTrip);
 });
 
@@ -121,8 +122,8 @@ app.get("/:id/dashboard", async (req, res) => {
 
   const result = await dashboard(trip);
   return res.status(200).json(result);
-
 });
+
 
 
 export default app;
