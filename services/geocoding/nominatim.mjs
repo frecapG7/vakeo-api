@@ -20,7 +20,6 @@ export const geocode = async (address) => {
         });
         const data = await response.json();
         if (data.length > 0) {
-            console.log(JSON.stringify(data[0]));
             const { lat, lon, display_name } = data[0];
             return {
                 coordinates: [parseFloat(lon), parseFloat(lat)],
@@ -28,7 +27,11 @@ export const geocode = async (address) => {
                 provider: 'nominatim',
             };
         } else {
-            throw new Error("Cannot find results");
+            return {
+                coordinates: [],
+                displayName: "No results",
+                provider: "nominatim"
+            }
         }
     } catch (error) {
         console.error("Nominatim request error:", error.message);

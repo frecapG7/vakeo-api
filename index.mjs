@@ -24,8 +24,6 @@ if(config.environment !== 'development'){
   app.use(morgan("dev"));
 }
 
-
-
 app.use(
   "/api",
   passport.authenticate("headerapikey", {
