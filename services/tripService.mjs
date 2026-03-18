@@ -55,7 +55,7 @@ export const createTrip = async (name, users, image) => {
 }
 
 
-export const updateTrip = async (trip, { name, image, startDate, endDate }) => {
+export const updateTrip = async (trip, { name, image, startDate, endDate, location }) => {
 
 
     verifyDates(startDate, endDate);
@@ -64,6 +64,7 @@ export const updateTrip = async (trip, { name, image, startDate, endDate }) => {
     trip.image = image;
     trip.startDate = startDate;
     trip.endDate = endDate;
+    trip.location = location;
 
     return await trip.save();
 }

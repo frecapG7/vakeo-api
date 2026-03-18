@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-
+import locationSchema from "./locationModel.mjs";
 
 const tripSchema = new mongoose.Schema({
     name: {
@@ -22,6 +22,10 @@ const tripSchema = new mongoose.Schema({
     endDate: {
         type: Date,
         required: false,
+    },
+    location: {
+        type: locationSchema,
+        required: false
     }
 
 }, { timestamps: true });
