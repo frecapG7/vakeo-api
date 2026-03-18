@@ -7,6 +7,7 @@ import votes from "./votes.mjs";
 import goods from "./goods.mjs";
 import polls from "./polls.mjs";
 import linkPreview from "./link-preview.mjs";
+import geocode from "./geocode.mjs";
 const app = express();
 
 app.use("/trips", trips);
@@ -19,9 +20,11 @@ app.use(goods);
 
 
 app.use(polls);
+app.use(linkPreview);
+app.use(geocode);
+
 //Deprecated
 app.use(votes);
-app.use(linkPreview);
 
 
 export default app;
