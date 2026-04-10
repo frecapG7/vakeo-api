@@ -3,7 +3,7 @@ import { getTrip, createTrip, deleteTrip, updateTrip, dashboard, search } from "
 import { createTripUser, createTripUsers, getTripUserById } from "../services/tripUserService.mjs";
 import { generateJWT } from "../services/tokenService.mjs";
 import { verifyUser } from "../services/validationService.mjs";
-import { ForbiddenError } from "../utils/errors.mjs";
+import { ForbiddenError, InvalidError } from "../utils/errors.mjs";
 
 const app = express();
 
@@ -20,14 +20,14 @@ app.get("/:id", async (req, res) => {
   return res.status(200).json(trip);
 });
 
-app.post("/", async (req, res) => {
+app.post("", async (req, res) => {
   // Check all users have unique key
   const { users } = req.body;
-  if (users?.length <= 1 && users?.length > 20)
-    throw new Error("Cannot create trip: a trip must have between 1 and 20 users");
+  if (users?.length === 0 || users?.length > 20)
+    throw new InvalidError("Cannot create trip: a trip must have between 1 and 20 users");
 
   const tripUsers = await createTripUsers(users);
-  const trip = await createTrip(req.body.name, tripUsers, req.body.image);
+  const trip = await createTrip({ ...req.body.name, users: tripUsers });
   return res.status(201).json(trip);
 });
 
@@ -49,7 +49,7 @@ app.delete("/:id", async (req, res) => {
 app.post("/:id/users", async (req, res) => {
 
   const trip = await getTrip(req.params.id);
-  if(trip.isPrivate)
+  if (trip.isPrivate)
     throw new ForbiddenError("Cannot add user on private trip");
 
   const newUser = await createTripUser(req.body);
@@ -59,7 +59,7 @@ app.post("/:id/users", async (req, res) => {
 
   await savedTrip.populate("users");
 
-  return res.status(200).json(trip);
+  return res.status(200).json(savedTrip);
 
 });
 

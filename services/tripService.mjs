@@ -44,7 +44,7 @@ export const getTrip = async (id) => {
 }
 
 
-export const createTrip = async (name, description, users, image, isPrivate) => {
+export const createTrip = async ({name, description, users, image, isPrivate}) => {
     const trip = new Trip({
         name,
         description,
@@ -69,9 +69,9 @@ export const updateTrip = async (trip, { name, description, users, image, startD
     trip.location = location;
     trip.isPrivate = isPrivate;
 
-    const savedUsers = await Promise.all(users.filter(user => !user._id)
+    const savedUsers = await Promise.all(users?.filter?.(user => !user._id)
         .map(user => createTripUser(user)));
-    trip.users.push(savedUsers.map(u => u._id));
+    trip.users.push(...savedUsers.map(u => u._id));
 
     return await trip.save();
 }
@@ -83,8 +83,6 @@ export const deleteTrip = async (id) => {
     if (!trip)
         throw new NotFoundError(`Cannot find trip to delete with id ${id}`);
 }
-
-
 
 
 export const dashboard = async (trip, user) => {
