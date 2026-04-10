@@ -23,6 +23,6 @@ export class ForbiddenError extends Error {
     constructor(message){
         super(message);
         this.name = "ForbiddenError";
-        this.statusCode = 401
+        this.statusCode = 403
     }
 }

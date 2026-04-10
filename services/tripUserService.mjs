@@ -7,13 +7,10 @@ export const getTripUserById = async (id) => {
 
 export const createTripUsers = async (users = []) => {
 
-
     const newUsers = users.map(async (user) => createTripUser(user));
     const savedUsers = await Promise.all(newUsers);
     return savedUsers;
 }
-
-
 
 export const createTripUser = async (user) => {
     const newUser = buildTripUser(user);

@@ -4,6 +4,7 @@ import Good from "../models/goodModel.mjs";
 import Event from "../models/eventModel.mjs";
 import { NotFoundError } from "../utils/errors.mjs";
 import { verifyDates } from "./validationService.mjs";
+import { createTripUser } from "./tripUserService.mjs";
 
 export const search = async ({ ids, search }) => {
 
@@ -43,28 +44,34 @@ export const getTrip = async (id) => {
 }
 
 
-export const createTrip = async (name, users, image) => {
+export const createTrip = async ({name, description, users, image, isPrivate}) => {
     const trip = new Trip({
         name,
+        description,
         users,
-        image
+        image,
+        isPrivate
     });
     const savedTrip = await trip.save();
 
     return savedTrip;
 }
 
-
-export const updateTrip = async (trip, { name, image, startDate, endDate, location }) => {
-
+export const updateTrip = async (trip, { name, description, users, image, startDate, endDate, location, isPrivate }) => {
 
     verifyDates(startDate, endDate);
 
     trip.name = name;
+    trip.description = description;
     trip.image = image;
     trip.startDate = startDate;
     trip.endDate = endDate;
     trip.location = location;
+    trip.isPrivate = isPrivate;
+
+    const savedUsers = await Promise.all(users?.filter?.(user => !user._id)
+        .map(user => createTripUser(user)));
+    trip.users.push(...savedUsers.map(u => u._id));
 
     return await trip.save();
 }
@@ -76,8 +83,6 @@ export const deleteTrip = async (id) => {
     if (!trip)
         throw new NotFoundError(`Cannot find trip to delete with id ${id}`);
 }
-
-
 
 
 export const dashboard = async (trip, user) => {

@@ -3,6 +3,7 @@ import { getTrip, createTrip, deleteTrip, updateTrip, dashboard, search } from "
 import { createTripUser, createTripUsers, getTripUserById } from "../services/tripUserService.mjs";
 import { generateJWT } from "../services/tokenService.mjs";
 import { verifyUser } from "../services/validationService.mjs";
+import { ForbiddenError, InvalidError } from "../utils/errors.mjs";
 
 const app = express();
 
@@ -19,17 +20,18 @@ app.get("/:id", async (req, res) => {
   return res.status(200).json(trip);
 });
 
-app.post("/", async (req, res) => {
+app.post("", async (req, res) => {
   // Check all users have unique key
-  const users = req.body.users;
-  if (users?.length < 2 && users?.length > 20)
-    throw new Error("Cannot create trip: a trip must have between 2 and 20 users");
+  const { users } = req.body;
+  if (users?.length === 0 || users?.length > 20)
+    throw new InvalidError("Cannot create trip: a trip must have between 1 and 20 users");
 
   const tripUsers = await createTripUsers(users);
-  const trip = await createTrip(req.body.name, tripUsers, req.body.image);
+  const trip = await createTrip({ ...req.body.name, users: tripUsers });
   return res.status(201).json(trip);
 });
 
+// Should we restrict who can do this ?
 app.put("/:id", async (req, res) => {
   const trip = await getTrip(req.params.id);
 
@@ -43,6 +45,23 @@ app.delete("/:id", async (req, res) => {
   const trip = await deleteTrip(req.params.id);
   return res.status(200);
 })
+
+app.post("/:id/users", async (req, res) => {
+
+  const trip = await getTrip(req.params.id);
+  if (trip.isPrivate)
+    throw new ForbiddenError("Cannot add user on private trip");
+
+  const newUser = await createTripUser(req.body);
+  trip.users.push(newUser._id);
+
+  const savedTrip = await trip.save();
+
+  await savedTrip.populate("users");
+
+  return res.status(200).json(savedTrip);
+
+});
 
 app.put("/:id/users", async (req, res) => {
 
