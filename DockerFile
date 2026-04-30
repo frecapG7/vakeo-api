@@ -1,18 +1,30 @@
 
-FROM node:latest as build
+FROM node:18-alpine as build
 WORKDIR /build
 
-# Copy package.json and package-lock.json (if present) for dependency installation
-COPY package.json /build
+# Copy package files
+COPY package*.json ./
 
 # Install the dependencies
-RUN npm install --production
+RUN npm install
 
 # Copy the rest of the application code
-COPY . /build
+COPY . .
 
-# Expose the port your app will run on
+# If link-preview-js needs building, this will trigger postinstall scripts
+RUN npm rebuild && npm cache clean --force
+
+# Production stage
+FROM node:18-alpine
+WORKDIR /app
+
+# Copy only production dependencies
+COPY --from=build /build/package*.json ./
+RUN npm install --omit=dev
+
+# Copy built application
+COPY --from=build /build/node_modules ./node_modules
+COPY --from=build /build/index.mjs ./
+
 EXPOSE 3000
-
-# Start the app
-CMD ["npm", "start"]
+CMD ["node", "index.mjs"]

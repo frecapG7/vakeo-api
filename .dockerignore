@@ -1,0 +1,38 @@
+# Ignore node_modules
+node_modules
+
+# Ignore git directory
+.git
+
+# Ignore log files
+*.log
+
+# Ignore Vibe directory
+.vibe
+
+# Ignore documentation folder
+@doc
+
+# Ignore environment files
+.env
+.env.local
+
+# Ignore IDE files
+.idea
+.vscode
+*.swp
+
+# Ignore build artifacts
+build
+dist
+
+# Ignore coverage reports
+coverage
+
+# Ignore Docker-related files
+Dockerfile
+.dockerignore
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
