@@ -29,10 +29,10 @@ const tripSchema = new mongoose.Schema({
         type: Date,
         required: false,
     },
+    // Deprecated
     location: {
         type: locationSchema,
         required: false,
-        deprecated: true
     },
     stops: {
         type: [tripStopSchema],
