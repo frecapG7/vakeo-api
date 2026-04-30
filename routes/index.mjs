@@ -1,5 +1,6 @@
 import express from "express";
 import trips from "./trips.mjs";
+import tripStops from "./tripStops.mjs";
 import messages from "./messages.mjs";
 import tokens from "./tokens.mjs";
 import events from "./events.mjs";
@@ -11,6 +12,7 @@ import geocode from "./geocode.mjs";
 const app = express();
 
 app.use("/trips", trips);
+app.use(tripStops);
 app.use(messages)
 
 

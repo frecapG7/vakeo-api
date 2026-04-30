@@ -14,7 +14,7 @@ app.get("/", async (req, res) => {
 });
 
 app.get("/:id", async (req, res) => {
-  const trip = await getTrip(req.params.id);
+  const trip = await getTrip(req.params.id, !!req.query?.includeStops);
 
   await trip.populate("users");
   return res.status(200).json(trip);

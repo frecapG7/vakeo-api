@@ -34,8 +34,11 @@ export const search = async ({ ids, search }) => {
 
 }
 
-export const getTrip = async (id) => {
-    const trip = await Trip.findById(id);
+export const getTrip = async (id, includeStops = false) => {
+    const query = Trip.findById(id);
+    if(!includeStops)
+        query.select("-stops");
+    const trip = await query.exec();
 
     if (!trip)
         throw new NotFoundError(`Cannot find trip with id ${id}`);
