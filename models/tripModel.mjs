@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import locationSchema from "./locationModel.mjs";
+import tripStopSchema from "./tripStopModel.mjs";
 
 const tripSchema = new mongoose.Schema({
     name: {
@@ -7,7 +8,7 @@ const tripSchema = new mongoose.Schema({
         required: true,
         maxLength: 50,
     },
-    description : {
+    description: {
         type: String,
         required: false,
         maxLength: 500
@@ -28,25 +29,35 @@ const tripSchema = new mongoose.Schema({
         type: Date,
         required: false,
     },
+    // Deprecated
     location: {
         type: locationSchema,
-        required: false
+        required: false,
     },
-    isPrivate : {
+    stops: {
+        type: [tripStopSchema],
+        validate: {
+            validator: function (stops) {
+                return stops.length <= 50;
+            },
+            message: "A trip cannot have more than 50 stops.",
+        },
+    },
+    isPrivate: {
         type: Boolean,
         default: false,
     },
     splittingLink: {
-        type : {
+        type: {
             url: {
-                type: String, 
-                required : false
+                type: String,
+                required: false
             },
             icon: {
                 type: String,
                 required: false
             },
-            title : {
+            title: {
                 type: String,
                 required: false
             }

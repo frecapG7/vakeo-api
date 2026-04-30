@@ -14,7 +14,8 @@ app.get("/", async (req, res) => {
 });
 
 app.get("/:id", async (req, res) => {
-  const trip = await getTrip(req.params.id);
+  const includeStops = String(req.query?.includeStops).toLowerCase() === "true";
+  const trip = await getTrip(req.params.id, includeStops);
 
   await trip.populate("users");
   return res.status(200).json(trip);
