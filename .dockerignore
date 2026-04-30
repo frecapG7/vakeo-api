@@ -9,9 +9,7 @@ node_modules
 
 # Ignore Vibe directory
 .vibe
-
-# Ignore documentation folder
-@doc
+docs
 
 # Ignore environment files
 .env
