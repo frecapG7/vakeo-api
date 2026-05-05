@@ -11,13 +11,29 @@ const app = express();
     /forbidden/i,
     /blocked/i,
     /403/i,
+    /404/i,
     /restricted/i,
     /not\s+allowed/i,
+    /not\s+found/i,
     /bot\s+detected/i,
+    /unavailable/i,
+    /service\s+unavailable/i,
+    /please\s+enable\s+javascript/i,
+    /cloudflare/i,
+    /security\s+check/i,
+    /sorry,\s+you\s+have\s+been\s+blocked/i,
   ];
+
 const isAccessDenied = (preview) => {
     if(!preview?.title) return true;
     return errorKeywords.some(keyword => keyword.test(preview.title));
+}
+
+const selectBestImage = (images) => {
+    if (!images || images.length === 0) return null;
+    return images.reduce((best, current) =>
+        (current.width || 0) > (best.width || 0) ? current : best
+    );
 }
 
 app.post("/link-preview", async (req, res) => {
@@ -28,8 +44,10 @@ app.post("/link-preview", async (req, res) => {
         const preview = await getLinkPreview(url, {
             imagesPropertyType: "og",
             headers: {
-                // "user-agent": "googlebot"
-                "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 YaBrowser/26.3.0.1879.10 YaApp_iOS/2603.0 YaApp_iOS_Browser/2603.0 Safari/604.1 SA/3 Version/26.2"
+                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+                "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                "accept-language": "en-US,en;q=0.5",
+                "referer": "https://www.google.com/"
             },
             timeout: 30000,
             resolveDNSHost: async (url) => {
@@ -62,6 +80,7 @@ app.post("/link-preview", async (req, res) => {
         });
 
         const success = !isAccessDenied(preview);
+        const bestImage = selectBestImage(preview?.images);
 
         return res.status(200).json({
             success,
@@ -70,7 +89,7 @@ app.post("/link-preview", async (req, res) => {
                     url: preview.url,
                     title: preview.title,
 
-                    image: preview?.images[0],
+                    image: bestImage,
                     icon: preview?.favicons[0]
                 }
             })
