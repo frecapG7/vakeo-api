@@ -134,7 +134,7 @@ app.post("/:id/share", async (req, res) => {
 app.get("/:id/share", async (req, res) => {
   const trip = await getTrip(req.params.id);
   const obfuscatedId = await encodeId(trip._id.toString());
-   return res.json({ value: Buffer.from(obfuscatedId).toString('base64url') });
+  return res.json({ value: Buffer.from(obfuscatedId).toString('base64url') });
 });
 
 

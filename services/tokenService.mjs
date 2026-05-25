@@ -3,6 +3,7 @@ import config from "../config.mjs";
 
 const secret = new TextEncoder().encode(config.token_secret);
 
+// @deprecated
 export const generateJWT = async (id, expiresIn = "1h") => {
     try {
         const jwt = await new SignJWT({ sub: String(id) })
@@ -19,6 +20,7 @@ export const generateJWT = async (id, expiresIn = "1h") => {
 }
 
 
+// @deprecated
 export const verifyJWT = async (jwt) => {
     try {
         const { payload } = await jwtVerify(jwt, secret);
