@@ -2,6 +2,7 @@ import express from "express";
 import { getTrip, createTrip, deleteTrip, updateTrip, dashboard, search } from "../services/tripService.mjs";
 import { createTripUser, createTripUsers, getTripUserById } from "../services/tripUserService.mjs";
 import { generateJWT } from "../services/tokenService.mjs";
+import {encodeId} from "../services/idEncoderService.mjs";
 import { verifyUser } from "../services/validationService.mjs";
 import { ForbiddenError, InvalidError } from "../utils/errors.mjs";
 
@@ -128,6 +129,12 @@ app.post("/:id/share", async (req, res) => {
   return res.status(200).json({
     value: Buffer.from(jwt, "utf-8").toString('base64url')
   });
+});
+
+app.get("/:id/share", async (req, res) => {
+  const trip = await getTrip(req.params.id);
+  const obfuscatedId = await encodeId(trip._id.toString());
+   return res.json({ value: Buffer.from(obfuscatedId).toString('base64url') });
 });
 
 
