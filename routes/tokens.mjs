@@ -1,7 +1,7 @@
 import express from "express";
 import { getTrip } from "../services/tripService.mjs";
 import { verifyJWT } from "../services/tokenService.mjs";
-import {decodeId} from "../services/idEncoderService.mjs";
+import { decodeId } from "../services/idEncoderService.mjs";
 const app = express();
 
 
@@ -35,14 +35,18 @@ app.get("/:token", async (req, res) => {
 
 app.get("/v2/:token", async (req, res) => {
 
-    const token = req.params?.token;
-    const payload = await decodeId(decrypt(token));
-    const trip = await getTrip(payload);
-    return res.status(200).json({
-        _id: trip?.id,
-        image: trip?.image,
-        name: trip?.name
-    });
+    try {
+        const token = req.params?.token;
+        const payload = await decodeId(decrypt(token));
+        const trip = await getTrip(payload);
+        return res.status(200).json({
+            _id: trip?.id,
+            image: trip?.image,
+            name: trip?.name
+        });
+    } catch (error) {
+        return res.status(400).json({ message: "Invalid share token" });
+    }
 });
 
 
