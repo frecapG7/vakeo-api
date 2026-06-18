@@ -1,20 +1,41 @@
 import mongoose from "mongoose";
 import { isValidUrl } from "../utils/validator.mjs";
 
-const optionSchema = new mongoose.Schema({
+// Base option fields shared across all poll types
+const baseOptionFields = {
     selectedBy: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: "TripUser"
     }]
-}, {
-    toJSON: {virtuals: true}
-});
+};
 
+// Reusable option schema with virtuals
+function createOptionSchema(extraFields = {}) {
+    const schema = new mongoose.Schema({
+        ...baseOptionFields,
+        ...extraFields
+    }, {
+        toJSON: { virtuals: true }
+    });
+    
+    // Virtual for percentage calculation
+    schema.virtual('percent').get(function() {
+        const selectedCount = this.selectedBy?.length || 0;
+        const totalSelected = this.parent().hasSelected?.length || 1; // Avoid division by zero
+        const percent = (selectedCount / totalSelected) * 100;
+        return Number(percent).toFixed(2);
+    });
+    
+    return schema;
+}
+
+const optionSchema = createOptionSchema();
 
 const pollSchema = new mongoose.Schema({
     question: {
         type: String,
-        required: true
+        required: true,
+        maxlength: [500, "Question cannot exceed 500 characters"]
     },
     trip: {
         type: mongoose.Schema.Types.ObjectId,
@@ -43,21 +64,17 @@ const pollSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "TripUser"
     }],
-    options: [optionSchema]
-},
-    {
-        discriminatorKey: "type",
-        timestamps: true,
-        toJSON: { virtuals: true }
+    options: {
+        type: [optionSchema],
+        validate: {
+            validator: function (arr) { return arr.length <= 20; },
+            message: "A poll cannot have more than 20 options"
+        }
     }
-);
-
-// Virtual pour le calcul du pourcentage
-optionSchema.virtual('percent').get(function() {
-    const selectedCount = this.selectedBy?.length || 0;
-    const totalSelected = this.parent().hasSelected?.length || 1; // Évite la division par zéro
-    const percent =  (selectedCount / totalSelected) * 100;
-    return Number(percent).toFixed(2);
+}, {
+    discriminatorKey: "type",
+    timestamps: true,
+    toJSON: { virtuals: true }
 });
 
 pollSchema.pre("save", async function () {
@@ -67,82 +84,48 @@ pollSchema.pre("save", async function () {
     this.hasSelected = [...new Set(allSelectedUsers)];
 });
 
-
 export const Poll = mongoose.model("Poll", pollSchema);
 
-export const DatesPoll = Poll.discriminator("DatesPoll", new mongoose.Schema({
-    options: {
-        type: [
-            {
-                startDate: {
-                    type: Date,
-                    required: true,
-                },
-                endDate: {
-                    type: Date,
-                    required: true,
-                },
-                selectedBy: [{
-                    type: mongoose.Schema.Types.ObjectId,
-                    ref: "TripUser"
-                }]
-            }
+export const DatesPoll = Poll.discriminator(
+    "DatesPoll",
+    new mongoose.Schema({
+        options: [
+            createOptionSchema({
+                startDate: { type: Date, required: true },
+                endDate: { type: Date, required: true }
+            })
         ]
-    }
-}));
+    })
+);
 
-export const HousingPoll = Poll.discriminator("HousingPoll", new mongoose.Schema({
-    options: {
-        type: [
-            {
-                title: {
-                    type: String,
-                    required: true
-                },
+export const HousingPoll = Poll.discriminator(
+    "HousingPoll",
+    new mongoose.Schema({
+        options: [
+            createOptionSchema({
+                title: { type: String, required: true },
                 url: {
                     type: String,
                     required: true,
                     validate: {
-                        validator: function (v) {
-                            return isValidUrl(v);
-                        },
+                        validator: function (v) { return isValidUrl(v); },
                         message: props => `${props.value} is not a valid url`
                     }
                 },
-                image: {
-                    type: String,
-                    required: false
-                },
-                icon: {
-                    type: String,
-                    required: false,
-                },
-                selectedBy: [{
-                    type: mongoose.Schema.Types.ObjectId,
-                    ref: "TripUser"
-                }]
-            }
+                image: { type: String },
+                icon: { type: String }
+            })
         ]
-    }
-}));
+    })
+);
 
-
-
-export const OtherPoll = Poll.discriminator("OtherPoll", new mongoose.Schema({
-    options: {
-        type: [
-            {
-                value: {
-                    type: String,
-                    required: true
-                },
-                selectedBy: [{
-                    type: mongoose.Schema.Types.ObjectId
-                }]
-            }
+export const OtherPoll = Poll.discriminator(
+    "OtherPoll",
+    new mongoose.Schema({
+        options: [
+            createOptionSchema({
+                value: { type: String, required: true }
+            })
         ]
-    }
-}))
-
-
-
+    })
+);
