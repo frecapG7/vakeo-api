@@ -19,7 +19,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(passport.initialize());
-app.use(handleError);
 
 
 connect();
@@ -38,6 +37,9 @@ app.use(
   }),
   routes
 );
+
+// Error handler must be declared last
+app.use(handleError);
 
 app.listen(config.port, () => {
   console.log(`Server for env : ${config.environment} is now running on port ${config.port}`);
