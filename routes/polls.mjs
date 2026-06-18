@@ -59,27 +59,23 @@ app.put("/trips/:tripId/polls/:pollId",
 });
 
 
-app.patch("/trips/:tripId/polls/:pollId/vote", async (req, res) => {
-
+app.patch("/trips/:tripId/polls/:pollId/vote",
+  passport.authenticate('user-header', { session: false }),
+  async (req, res) => {
     const { tripId, pollId } = req.params;
     const trip = await getTrip(tripId);
-
-    const newPoll = await votePoll(trip, pollId, req.body);
+    const newPoll = await votePoll(trip, pollId, { ...req.body, user: req.user });
     return res.status(200).json(newPoll);
-
 });
 
 
-app.delete("/trips/:tripId/polls/:pollId/vote/:optionsId", async (req, res) => {
-
+app.delete("/trips/:tripId/polls/:pollId/vote/:optionsId",
+  passport.authenticate('user-header', { session: false }),
+  async (req, res) => {
     const { tripId, pollId, optionsId } = req.params;
     const trip = await getTrip(tripId);
-
-    const userId = req.headers["x-user-id"];
-
-    const newPoll = await unvotePoll(trip, pollId, optionsId, userId);
+    const newPoll = await unvotePoll(trip, pollId, optionsId, req.user._id);
     return res.status(200).json(newPoll);
-
 });
 
 
