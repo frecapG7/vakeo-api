@@ -1,0 +1,1 @@
+export const POLL_MAX_OPTIONS = 20;
