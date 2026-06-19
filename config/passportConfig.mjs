@@ -2,6 +2,7 @@ import passport from "passport";
 import { HeaderAPIKeyStrategy } from "passport-headerapikey";
 import config from "../config.mjs";
 import TripUser from "../models/tripUserModel.mjs";
+import mongoose from "mongoose";
 
 passport.use(
   new HeaderAPIKeyStrategy(

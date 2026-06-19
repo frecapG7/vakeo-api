@@ -16,7 +16,20 @@ const tripStopSchema = new mongoose.Schema({
         type: linkSchema,
         required: false,
     },
-    // Future fields (e.g., duration, order, notes)
+    polls: {
+        type: [{
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Poll"
+        }],
+        validate: {
+            validator: function(arr) { return arr.length <= 10; },
+            message: "A stop cannot have more than 10 polls"
+        }
+    },
+    trip: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Trip"
+    }
 });
 
-export default tripStopSchema;
+export default mongoose.model("TripStop", tripStopSchema);

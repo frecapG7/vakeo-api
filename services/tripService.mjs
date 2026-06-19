@@ -1,4 +1,5 @@
 import Trip from "../models/tripModel.mjs";
+import TripStop from "../models/tripStopModel.mjs";
 import { Poll } from "../models/pollModel.mjs";
 import Good from "../models/goodModel.mjs";
 import Event from "../models/eventModel.mjs";
@@ -35,19 +36,19 @@ export const search = async ({ ids, search }) => {
 }
 
 export const getTrip = async (id, includeStops = false) => {
-    const query = Trip.findById(id);
-    if(!includeStops)
-        query.select("-stops");
-    const trip = await query.exec();
-
+    const trip = await Trip.findById(id);
     if (!trip)
         throw new NotFoundError(`Cannot find trip with id ${id}`);
+    if (includeStops) {
+        trip.stops = await TripStop.find({ trip: id })
+            .populate("polls", "_id type question");
+    }
 
     return trip;
 }
 
 
-export const createTrip = async ({name, description, users, image, isPrivate}) => {
+export const createTrip = async ({ name, description, users, image, isPrivate }) => {
     const trip = new Trip({
         name,
         description,
