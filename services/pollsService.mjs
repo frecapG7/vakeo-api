@@ -3,6 +3,7 @@ import { DatesPoll, HousingPoll, OtherPoll, Poll } from "../models/pollModel.mjs
 import { InvalidError, NotFoundError } from "../utils/errors.mjs";
 import { isValidUrl } from "../utils/validator.mjs";
 import { verifyDates, verifyUser } from "./validationService.mjs";
+import { POLL_MAX_OPTIONS } from "../utils/constants.mjs";
 
 
 // Fields to select when populating user references
@@ -102,6 +103,9 @@ export const createPoll = async (trip, poll) => {
     verifyUser(trip, poll.createdBy);
     let newPoll;
 
+    if(poll.options?.length > POLL_MAX_OPTIONS)
+        throw new InvalidError(`Invalid poll options length: max is ${POLL_MAX_OPTIONS}`);
+
     switch (poll?.type) {
         case "DatesPoll": {
             // verify dates are correct
@@ -153,8 +157,8 @@ export const updatePoll = async (trip, pollId, user, { newOptions = [] }) => {
     if (newOptions.length === 0)
         return await populatePollFull(poll);
 
-    if (poll.options.length + newOptions.length > 15)
-        throw new InvalidError("Maximum 15 options allowed");
+    if (poll.options.length + newOptions.length > POLL_MAX_OPTIONS)
+        throw new InvalidError(`Maximum ${POLL_MAX_OPTIONS} options allowed`);
 
     switch (poll.type) {
         case "DatesPoll":
@@ -228,10 +232,12 @@ export const unvotePoll = async (trip, pollId, optionId, userId) => {
     if (!poll)
         throw new NotFoundError("Cannot find poll");
 
+    verifyUser(trip, {_id: userId});
+
     const pollOption = poll.options.find(o => o._id.equals(optionId));
     if (pollOption) {
         pollOption.selectedBy = pollOption.selectedBy.filter(
-            u => !u._id.equals(userId)
+            u => !userInArray([u], userId)
         );
     }
 

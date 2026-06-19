@@ -26,6 +26,8 @@ passport.use(
     false,
     async (userId, done) => {
       try {
+        if (!mongoose.Types.ObjectId.isValid(userId))
+          return done(null, false, { message: "Invalid user ID format" });
         const user = await TripUser.findById(userId);
         if (user) {
           return done(null, user);

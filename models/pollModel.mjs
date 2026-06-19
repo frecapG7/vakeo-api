@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { isValidUrl } from "../utils/validator.mjs";
+import { POLL_MAX_OPTIONS } from "../utils/constants.mjs";
 
 // Base option fields shared across all poll types
 const baseOptionFields = {
@@ -67,8 +68,8 @@ const pollSchema = new mongoose.Schema({
     options: {
         type: [optionSchema],
         validate: {
-            validator: function (arr) { return arr.length <= 20; },
-            message: "A poll cannot have more than 20 options"
+            validator: function (arr) { return arr.length <= POLL_MAX_OPTIONS; },
+            message: `A poll cannot have more than ${POLL_MAX_OPTIONS} options`
         }
     }
 }, {
@@ -89,43 +90,61 @@ export const Poll = mongoose.model("Poll", pollSchema);
 export const DatesPoll = Poll.discriminator(
     "DatesPoll",
     new mongoose.Schema({
-        options: [
-            createOptionSchema({
-                startDate: { type: Date, required: true },
-                endDate: { type: Date, required: true }
-            })
-        ]
+        options: {
+            type: [
+                createOptionSchema({
+                    startDate: { type: Date, required: true },
+                    endDate: { type: Date, required: true }
+                })
+            ],
+            validate: {
+                validator: function (arr) { return arr.length <= POLL_MAX_OPTIONS; },
+                message: `A poll cannot have more than ${POLL_MAX_OPTIONS} options`
+            }
+        }
     })
 );
 
 export const HousingPoll = Poll.discriminator(
     "HousingPoll",
     new mongoose.Schema({
-        options: [
-            createOptionSchema({
-                title: { type: String, required: true },
-                url: {
-                    type: String,
-                    required: true,
-                    validate: {
-                        validator: function (v) { return isValidUrl(v); },
-                        message: props => `${props.value} is not a valid url`
-                    }
-                },
-                image: { type: String },
-                icon: { type: String }
-            })
-        ]
+        options: {
+            type: [
+                createOptionSchema({
+                    title: { type: String, required: true },
+                    url: {
+                        type: String,
+                        required: true,
+                        validate: {
+                            validator: function (v) { return isValidUrl(v); },
+                            message: props => `${props.value} is not a valid url`
+                        }
+                    },
+                    image: { type: String },
+                    icon: { type: String }
+                })
+            ],
+            validate: {
+                validator: function (arr) { return arr.length <= POLL_MAX_OPTIONS; },
+                message: `A poll cannot have more than ${POLL_MAX_OPTIONS} options`
+            }
+        }
     })
 );
 
 export const OtherPoll = Poll.discriminator(
     "OtherPoll",
     new mongoose.Schema({
-        options: [
-            createOptionSchema({
-                value: { type: String, required: true }
-            })
-        ]
+        options: {
+            type: [
+                createOptionSchema({
+                    value: { type: String, required: true }
+                })
+            ],
+            validate: {
+                validator: function (arr) { return arr.length <= POLL_MAX_OPTIONS; },
+                message: `A poll cannot have more than ${POLL_MAX_OPTIONS} options`
+            }
+        }
     })
 );
