@@ -29,7 +29,16 @@ const tripStopSchema = new mongoose.Schema({
     trip: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Trip"
+    },
+    createdBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "TripUser",
+        required: true
+    },
+    modifiedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "TripUser"
     }
-});
+}, { timestamps: true });
 
 export default mongoose.model("TripStop", tripStopSchema);

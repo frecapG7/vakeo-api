@@ -100,9 +100,10 @@ export const getPoll = async (tripId, pollId) => {
 }
 
 
-export const createPoll = async (trip, poll) => {
+export const createPoll = async (trip, poll, user) => {
 
-    verifyUser(trip, poll.createdBy);
+    verifyUser(trip, user);
+    poll.createdBy = user._id;
 
     if (poll.options?.length > POLL_MAX_OPTIONS)
         throw new InvalidError(`Invalid poll options length: max is ${POLL_MAX_OPTIONS}`);

@@ -44,7 +44,7 @@ app.post("/trips/:tripId/polls",
   async (req, res) => {
     const { tripId } = req.params;
     const trip = await getTrip(tripId);
-    const newPoll = await createPoll(trip, { ...req.body, createdBy: req.user._id });
+    const newPoll = await createPoll(trip, req.body, req.user);
     return res.status(201).json(newPoll);
 })
 
