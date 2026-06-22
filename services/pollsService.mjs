@@ -77,7 +77,7 @@ export const searchPolls = async (tripId, { limit, cursor, sort = "asc", type, e
             { path: "createdBy", select: USER_SELECT },
             { path: "hasSelected", select: USER_SELECT },
             { path: "options.selectedBy", select: USER_SELECT, model: "TripUser" },
-            { path: "stop", select: "_id name"}
+            { path: "stop", select: "_id name" }
         ]);
     return polls;
 }
@@ -103,19 +103,26 @@ export const getPoll = async (tripId, pollId) => {
 export const createPoll = async (trip, poll, user) => {
 
     verifyUser(trip, user);
-    poll.createdBy = user._id;
 
-    if (poll.options?.length > POLL_MAX_OPTIONS)
+    const { question, options, type, stop: stopId } = poll;
+    if (options?.length > POLL_MAX_OPTIONS)
         throw new InvalidError(`Invalid poll options length: max is ${POLL_MAX_OPTIONS}`);
 
+    const baseData = {
+        question,
+        trip: trip._id,
+        createdBy: user._id,
+        options,
+        ...(stopId && { stop: stopId })
+    };
     const session = await Poll.startSession();
     try {
         const savedPoll = await session.withTransaction(async () => {
             // Verify stop exists and belongs to trip
             let stop;
-            if (poll.stop) {
+            if (stopId) {
                 stop = await TripStop.findOne({
-                    _id: poll.stop,
+                    _id: stopId,
                     trip: trip._id
                 }).session(session);
                 if (!stop)
@@ -124,27 +131,18 @@ export const createPoll = async (trip, poll, user) => {
             }
 
             let newPoll;
-            switch (poll?.type) {
+            switch (type) {
                 case "DatesPoll": {
-                    poll.options.forEach(({ startDate, endDate }) => verifyDates(startDate, endDate));
-                    newPoll = new DatesPoll({
-                        ...poll,
-                        trip
-                    });
+                    options.forEach(({ startDate, endDate }) => verifyDates(startDate, endDate));
+                    newPoll = new DatesPoll(baseData);
                     break;
                 }
                 case "HousingPoll": {
-                    newPoll = new HousingPoll({
-                        ...poll,
-                        trip,
-                    });
+                    newPoll = new HousingPoll(baseData);
                     break;
                 }
                 case "OtherPoll": {
-                    newPoll = new OtherPoll({
-                        ...poll,
-                        trip,
-                    });
+                    newPoll = new OtherPoll(baseData);
                     break;
                 }
                 default: throw new InvalidError("Invalid poll type");
@@ -155,7 +153,7 @@ export const createPoll = async (trip, poll, user) => {
             // Link poll to stop
             if (stop) {
                 stop.polls.push(savedPoll._id);
-                await stop.save({session});
+                await stop.save({ session });
             }
 
             await savedPoll.populate("createdBy", USER_SELECT);

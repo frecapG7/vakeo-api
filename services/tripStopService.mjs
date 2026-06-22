@@ -38,11 +38,15 @@ const createTripStop = async (tripId, stop, user) => {
   if (stopCount >= 50) {
     throw new InvalidError("Cannot add more than 50 stops to a trip");
   }
-  const { polls, ...safeData } = stop;
+  const { name, location, accommodation } = stop;
 
   return await TripStop.create({
-    ...safeData,
-    trip: tripId
+    name,
+    location,
+    accommodation,
+    trip: tripId,
+    createdBy: user._id,
+    modifiedBy: user._id
   });
 };
 
