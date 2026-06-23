@@ -34,15 +34,6 @@ const tripSchema = new mongoose.Schema({
         type: locationSchema,
         required: false,
     },
-    stops: {
-        type: [tripStopSchema],
-        validate: {
-            validator: function (stops) {
-                return stops.length <= 50;
-            },
-            message: "A trip cannot have more than 50 stops.",
-        },
-    },
     isPrivate: {
         type: Boolean,
         default: false,

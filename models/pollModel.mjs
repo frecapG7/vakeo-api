@@ -108,6 +108,11 @@ export const DatesPoll = Poll.discriminator(
 export const HousingPoll = Poll.discriminator(
     "HousingPoll",
     new mongoose.Schema({
+        stop: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "TripStop",
+            required: true
+        },
         options: {
             type: [
                 createOptionSchema({
@@ -135,6 +140,11 @@ export const HousingPoll = Poll.discriminator(
 export const OtherPoll = Poll.discriminator(
     "OtherPoll",
     new mongoose.Schema({
+        stop: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "TripStop",
+            
+        },
         options: {
             type: [
                 createOptionSchema({

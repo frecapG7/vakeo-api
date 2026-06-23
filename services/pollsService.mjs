@@ -4,6 +4,7 @@ import { InvalidError, NotFoundError } from "../utils/errors.mjs";
 import { isValidUrl } from "../utils/validator.mjs";
 import { verifyDates, verifyUser } from "./validationService.mjs";
 import { POLL_MAX_OPTIONS } from "../utils/constants.mjs";
+import TripStop from "../models/tripStopModel.mjs";
 
 
 // Fields to select when populating user references
@@ -11,36 +12,36 @@ const USER_SELECT = "_id name avatar";
 
 // Helper: Check if a user (or userId) exists in an array of users or userIds
 const userInArray = (array, user) => {
-	if (!array || !user) return false;
-	
-	const userId = user._id || user;
-	
-	return array.some(item => {
-		const itemId = item._id || item;
-		return itemId && userId && itemId.equals(userId);
-	});
+    if (!array || !user) return false;
+
+    const userId = user._id || user;
+
+    return array.some(item => {
+        const itemId = item._id || item;
+        return itemId && userId && itemId.equals(userId);
+    });
 };
 
 // Helper: Add user to a poll option's selectedBy array if not already present
 const addUserToOption = (pollOption, userId) => {
-	if (pollOption && !userInArray(pollOption.selectedBy, userId)) {
-		pollOption.selectedBy.push(userId);
-	}
+    if (pollOption && !userInArray(pollOption.selectedBy, userId)) {
+        pollOption.selectedBy.push(userId);
+    }
 };
 
 // Helper: Fully populate a poll with all necessary references
 const populatePollFull = async (poll) => {
-	await poll.populate("hasSelected", USER_SELECT);
-	await poll.populate({
-		path: "options",
-		populate: {
-			path: "selectedBy",
-			select: USER_SELECT,
-			model: "TripUser"
-		}
-	});
-	await poll.populate("createdBy", USER_SELECT);
-	return poll;
+    await poll.populate("hasSelected", USER_SELECT);
+    await poll.populate({
+        path: "options",
+        populate: {
+            path: "selectedBy",
+            select: USER_SELECT,
+            model: "TripUser"
+        }
+    });
+    await poll.populate("createdBy", USER_SELECT);
+    return poll;
 };
 
 export const searchPolls = async (tripId, { limit, cursor, sort = "asc", type, excludeClosed = false, excludeSelectedBy }) => {
@@ -67,7 +68,7 @@ export const searchPolls = async (tripId, { limit, cursor, sort = "asc", type, e
     const options = {
         limit,
         sort: {
-            _id: sort === "asc" ? 1 : -1 
+            _id: sort === "asc" ? 1 : -1
         }
     }
 
@@ -75,7 +76,8 @@ export const searchPolls = async (tripId, { limit, cursor, sort = "asc", type, e
         .populate([
             { path: "createdBy", select: USER_SELECT },
             { path: "hasSelected", select: USER_SELECT },
-            { path: "options.selectedBy", select: USER_SELECT, model: "TripUser" }
+            { path: "options.selectedBy", select: USER_SELECT, model: "TripUser" },
+            { path: "stop", select: "_id name" }
         ]);
     return polls;
 }
@@ -98,46 +100,69 @@ export const getPoll = async (tripId, pollId) => {
 }
 
 
-export const createPoll = async (trip, poll) => {
+export const createPoll = async (trip, poll, user) => {
 
-    verifyUser(trip, poll.createdBy);
-    let newPoll;
+    verifyUser(trip, user);
 
-    if(poll.options?.length > POLL_MAX_OPTIONS)
+    const { question, options, type, stop: stopId } = poll;
+    if (options?.length > POLL_MAX_OPTIONS)
         throw new InvalidError(`Invalid poll options length: max is ${POLL_MAX_OPTIONS}`);
 
-    switch (poll?.type) {
-        case "DatesPoll": {
-            // verify dates are correct
-            poll.options.forEach(({ startDate, endDate }) => verifyDates(startDate, endDate));
-            newPoll = new DatesPoll({
-                ...poll,
-                trip
-            });
-            break;
-        }
-        case "HousingPoll": {
-            //Verify no troll links ? 
-            newPoll = new HousingPoll({
-                ...poll,
-                trip
-            });
-            break;
-        }
-        case "OtherPoll": {
-            newPoll = new OtherPoll({
-                ...poll,
-                trip
-            });
-            break;
-        }
-        default: throw new InvalidError("Invalid poll type");
+    const baseData = {
+        question,
+        trip: trip._id,
+        createdBy: user._id,
+        options,
+        ...(stopId && { stop: stopId })
+    };
+    const session = await Poll.startSession();
+    try {
+        const savedPoll = await session.withTransaction(async () => {
+            // Verify stop exists and belongs to trip
+            let stop;
+            if (stopId) {
+                stop = await TripStop.findOne({
+                    _id: stopId,
+                    trip: trip._id
+                }).session(session);
+                if (!stop)
+                    throw new InvalidError("Stop not found or does not belong to this trip");
+
+            }
+
+            let newPoll;
+            switch (type) {
+                case "DatesPoll": {
+                    options.forEach(({ startDate, endDate }) => verifyDates(startDate, endDate));
+                    newPoll = new DatesPoll(baseData);
+                    break;
+                }
+                case "HousingPoll": {
+                    newPoll = new HousingPoll(baseData);
+                    break;
+                }
+                case "OtherPoll": {
+                    newPoll = new OtherPoll(baseData);
+                    break;
+                }
+                default: throw new InvalidError("Invalid poll type");
+            }
+
+            const savedPoll = await newPoll.save({ session });
+
+            // Link poll to stop
+            if (stop) {
+                stop.polls.push(savedPoll._id);
+                await stop.save({ session });
+            }
+
+            await savedPoll.populate("createdBy", USER_SELECT);
+            return savedPoll;
+        });
+        return savedPoll;
+    } finally {
+        await session.endSession();
     }
-
-
-    const savedPoll = await newPoll.save();
-    await savedPoll.populate("createdBy", USER_SELECT);
-    return savedPoll;
 }
 
 export const updatePoll = async (trip, pollId, user, { newOptions = [] }) => {
@@ -232,7 +257,7 @@ export const unvotePoll = async (trip, pollId, optionId, userId) => {
     if (!poll)
         throw new NotFoundError("Cannot find poll");
 
-    verifyUser(trip, {_id: userId});
+    verifyUser(trip, { _id: userId });
 
     const pollOption = poll.options.find(o => o._id.equals(optionId));
     if (pollOption) {
