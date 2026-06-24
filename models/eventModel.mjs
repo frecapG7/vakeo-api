@@ -30,12 +30,16 @@ const eventSchema = new mongoose.Schema({
     type: {
         type: String,
         required: true,
-        enum: ["MEAL", "RESTAURANT", "SPORT", "PARTY", "VISITATION",  "ACTIVITY", "OTHER"]
+        enum: ["MEAL", "RESTAURANT", "SPORT", "PARTY", "VISITATION", "ACTIVITY", "OTHER"]
     },
     details: {
         type: String,
         required: false,
         maxLength: 255
+    },
+    goodsCount: {
+        type: Number,
+        default: 0
     }
 }, { timestamps: true });
 
