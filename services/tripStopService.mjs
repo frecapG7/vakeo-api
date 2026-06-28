@@ -7,7 +7,7 @@ import { verifyUser } from "./validationService.mjs";
 // Get all stops for a trip
 const getTripStops = async (tripId) => {
   const stops = await TripStop.find({ trip: tripId })
-    .populate("polls", "_id type question");
+    .populate("polls", "_id type question hasSelected");
   return stops || [];
 };
 
@@ -17,7 +17,7 @@ const getTripStop = async (tripId, stopId) => {
     _id: stopId,
     trip: tripId
   }).populate([
-    { path: "polls", select: "_id type question" },
+    { path: "polls", select: "_id type question hasSelected" },
     { path: "createdBy", select: "_id name avatar" },
     { path: "modifiedBy", select: "_id name avatar" }
   ]);
