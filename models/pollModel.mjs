@@ -78,11 +78,9 @@ const pollSchema = new mongoose.Schema({
     toJSON: { virtuals: true }
 });
 
-pollSchema.pre("save", async function () {
-    const allSelectedUsers = this.options.flatMap(
-        option => option.selectedBy.toString()
-    );
-    this.hasSelected = [...new Set(allSelectedUsers)];
+pollSchema.pre("save", function () {
+    const allSelectedUsers = this.options?.flatMap(option => option.selectedBy || []) || [];
+    this.hasSelected = [...new Map(allSelectedUsers.map(id => [id.toString(), id])).values()];
 });
 
 export const Poll = mongoose.model("Poll", pollSchema);
