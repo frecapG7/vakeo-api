@@ -29,6 +29,13 @@ const addUserToOption = (pollOption, userId) => {
     }
 };
 
+// Helper: Check if two users/userIds are the same
+const userMatches = (a, b) => {
+    const idA = a?._id || a;
+    const idB = b?._id || b;
+    return idA && idB && idA.equals(idB);
+};
+
 // Helper: Fully populate a poll with all necessary references
 const populatePollFull = async (poll) => {
     await poll.populate("hasSelected", USER_SELECT);
@@ -104,7 +111,7 @@ export const createPoll = async (trip, poll, user) => {
 
     verifyUser(trip, user);
 
-    const { question, options, type, stop: stopId } = poll;
+    const { question, options, type, stop: stopId, isAnonymous, isSingleAnswer } = poll;
     if (options?.length > POLL_MAX_OPTIONS)
         throw new InvalidError(`Invalid poll options length: max is ${POLL_MAX_OPTIONS}`);
 
@@ -113,7 +120,9 @@ export const createPoll = async (trip, poll, user) => {
         trip: trip._id,
         createdBy: user._id,
         options,
-        ...(stopId && { stop: stopId })
+        ...(stopId && { stop: stopId }),
+        ...(isAnonymous !== undefined && { isAnonymous }),
+        ...(isSingleAnswer !== undefined && { isSingleAnswer })
     };
     const session = await Poll.startSession();
     try {
@@ -232,9 +241,12 @@ export const votePoll = async (trip, pollId, { options, user }) => {
         if (options?.length > 1) {
             throw new InvalidError("Single-answer poll allows only one option");
         }
-        if (userInArray(poll.hasSelected, user)) {
-            throw new InvalidError("User has already voted on this single-answer poll");
-        }
+        // Remove user from all options to replace their vote
+        poll.options.forEach(option => {
+            option.selectedBy = option.selectedBy.filter(
+                u => !userMatches(u, user._id)
+            );
+        });
     }
 
     options?.forEach(optionId => {
@@ -262,7 +274,7 @@ export const unvotePoll = async (trip, pollId, optionId, userId) => {
     const pollOption = poll.options.find(o => o._id.equals(optionId));
     if (pollOption) {
         pollOption.selectedBy = pollOption.selectedBy.filter(
-            u => !userInArray([u], userId)
+            u => !userMatches(u, userId)
         );
     }
 
