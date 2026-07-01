@@ -29,6 +29,13 @@ const addUserToOption = (pollOption, userId) => {
     }
 };
 
+// Helper: Check if two users/userIds are the same
+const userMatches = (a, b) => {
+    const idA = a?._id || a;
+    const idB = b?._id || b;
+    return idA && idB && idA.equals(idB);
+};
+
 // Helper: Fully populate a poll with all necessary references
 const populatePollFull = async (poll) => {
     await poll.populate("hasSelected", USER_SELECT);
@@ -237,7 +244,7 @@ export const votePoll = async (trip, pollId, { options, user }) => {
         // Remove user from all options to replace their vote
         poll.options.forEach(option => {
             option.selectedBy = option.selectedBy.filter(
-                u => !userInArray([u], user._id)
+                u => !userMatches(u, user._id)
             );
         });
     }
@@ -267,7 +274,7 @@ export const unvotePoll = async (trip, pollId, optionId, userId) => {
     const pollOption = poll.options.find(o => o._id.equals(optionId));
     if (pollOption) {
         pollOption.selectedBy = pollOption.selectedBy.filter(
-            u => !userInArray([u], userId)
+            u => !userMatches(u, userId)
         );
     }
 
