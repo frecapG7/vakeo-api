@@ -25,6 +25,11 @@ jobs:
         with:
           node-version: '18'
 
+      - name: Configure Git
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+
       - name: Bump version
         run: npm version ${{ inputs.release_type }}
 
@@ -32,13 +37,8 @@ jobs:
         id: version
         run: echo "version=$(node -p \"require('./package.json').version\")" >> $GITHUB_OUTPUT
 
-      - name: Commit and tag
+      - name: Push changes and tags
         run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          git add package.json
-          git commit -m "chore: release v${{ steps.version.outputs.version }}"
-          git tag v${{ steps.version.outputs.version }}
           git push
           git push --tags
 
