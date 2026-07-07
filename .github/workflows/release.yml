@@ -1,0 +1,60 @@
+name: Create Release
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Type of release'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Bump version
+        run: npm version ${{ inputs.release_type }}
+
+      - name: Get new version
+        id: version
+        run: echo "version=$(node -p \"require('./package.json').version\")" >> $GITHUB_OUTPUT
+
+      - name: Commit and tag
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add package.json
+          git commit -m "chore: release v${{ steps.version.outputs.version }}"
+          git tag v${{ steps.version.outputs.version }}
+          git push
+          git push --tags
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          tags: |
+            ghcr.io/frecapg7/vakeo-api:latest
+            ghcr.io/frecapg7/vakeo-api:v${{ steps.version.outputs.version }}
+            ghcr.io/frecapg7/vakeo-api:${{ github.sha }}
+          file: DockerFile
