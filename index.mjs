@@ -14,7 +14,7 @@ const limiter = rateLimit({
 });
 
 const app = express();
-app.set('trust proxy', 1);
+app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS) || 1);
 app.use(limiter);
 app.use(cors());
 app.use(express.json());
