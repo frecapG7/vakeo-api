@@ -29,7 +29,7 @@ app.post("", async (req, res) => {
     throw new InvalidError("Cannot create trip: a trip must have between 1 and 20 users");
 
   const tripUsers = await createTripUsers(users);
-  const trip = await createTrip({ ...req.body.name, users: tripUsers });
+  const trip = await createTrip({ ...req.body, users: tripUsers });
   return res.status(201).json(trip);
 });
 
