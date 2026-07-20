@@ -141,8 +141,8 @@ app.get("/:id/dashboard", async (req, res) => {
   const trip = await getTrip(req.params.id);
   const { user } = req.query;
 
-  if (trip.isPrivate && !user) {
-    throw new ForbiddenError("Private trip requires user");
+  if (trip.isPrivate && (!user || !trip.users.includes(user))) {
+    throw new ForbiddenError("Private trip requires authenticated user who is a member of the trip");
   }
 
   const result = await dashboard(trip, user);
