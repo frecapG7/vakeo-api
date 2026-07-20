@@ -3,7 +3,6 @@ import { getTrip, createTrip, deleteTrip, updateTrip, dashboard, search } from "
 import { createTripUser, createTripUsers, getTripUserById } from "../services/tripUserService.mjs";
 import { generateJWT } from "../services/tokenService.mjs";
 import {encodeId} from "../services/idEncoderService.mjs";
-import { verifyUser } from "../services/validationService.mjs";
 import { ForbiddenError, InvalidError } from "../utils/errors.mjs";
 
 const app = express();
@@ -140,14 +139,13 @@ app.get("/:id/share", async (req, res) => {
 
 app.get("/:id/dashboard", async (req, res) => {
   const trip = await getTrip(req.params.id);
-
-
   const { user } = req.query;
 
+  if (trip.isPrivate && !user) {
+    throw new ForbiddenError("Private trip requires user");
+  }
 
-  await verifyUser(trip, { _id: user });
-
-  const result = await dashboard(trip);
+  const result = await dashboard(trip, user);
   return res.status(200).json(result);
 });
 

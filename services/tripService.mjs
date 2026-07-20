@@ -1,6 +1,5 @@
 import Trip from "../models/tripModel.mjs";
 import TripStop from "../models/tripStopModel.mjs";
-import { Poll } from "../models/pollModel.mjs";
 import Good from "../models/goodModel.mjs";
 import Event from "../models/eventModel.mjs";
 import { NotFoundError } from "../utils/errors.mjs";
@@ -89,80 +88,57 @@ export const deleteTrip = async (id) => {
 }
 
 
-export const dashboard = async (trip, user) => {
+export const dashboard = async (trip, userId) => {
+  const [stopsData, goodsData, eventsData] = await Promise.all([
+    stops(trip),
+    goods(trip),
+    events(trip, userId),
+  ]);
 
-    // 1 - Récupération parallèle des données dynamiques
-    const [pollsData, goodsData, eventsData] = await Promise.all([
-        polls(trip),
-        goods(trip),
-        events(trip, user),
-    ]);
-
-    // 2 - Get Attendees data
-    await trip.populate("users");
-
-    const attendees = {
-        total: trip?.users.length,
-        restrictions: [...new Set(trip.users.flatMap(u => u.restrictions))]
-    };
-
-
-    return {
-        polls: pollsData,
-        attendees,
-        goods: goodsData,
-        events: eventsData,
-        attendees
-    };
+  return {
+    stops: stopsData,
+    goods: goodsData,
+    events: eventsData,
+  };
 }
 
-const polls = async (trip) => {
+const stops = async (trip) => {
+  const [count, firstStop, lastStop] = await Promise.all([
+    TripStop.countDocuments({ trip: trip._id }),
+    TripStop.findOne({ trip: trip._id }, 'name', { sort: { createdAt: 1 } }),
+    TripStop.findOne({ trip: trip._id }, 'name', { sort: { createdAt: -1 } })
+  ]);
 
-    const pending = await Poll.countDocuments({
-        trip,
-        isClosed: false
-    });
-    const total = await Poll.countDocuments({
-        trip,
-    });
-
-    return {
-        pending,
-        total
-    };
-}
+  return {
+    count,
+    first: firstStop?.name || null,
+    last: lastStop?.name || null
+  };
+};
 
 const goods = async (trip) => {
-    const missing = await Good.countDocuments({
-        trip,
-        checked: false
-    });
-    const total = await Good.countDocuments({
-        trip,
-    });
+  const [missing, total] = await Promise.all([
+    Good.countDocuments({ trip, checked: false }),
+    Good.countDocuments({ trip }),
+  ]);
+  return { missing, total };
+};
 
-    return {
-        missing,
-        total
-    }
-}
+const events = async (trip, userId) => {
+  const now = new Date();
 
-const events = async (trip, user) => {
-    const attending = await Event.countDocuments({
-        trip,
-        attendees: user
-    });
-    const ownership = await Event.countDocuments({
-        trip,
-        owner: user
-    });
-    const total = await Event.countDocuments({
-        trip
-    });
+  const [total, nextEvent, totalAttendings] = await Promise.all([
+    Event.countDocuments({ trip: trip._id }),
+    Event.findOne(
+      { trip: trip._id, startDate: { $gte: now } },
+      null,
+      { sort: { startDate: 1 } }
+    ),
+    userId ? Event.countDocuments({
+      trip: trip._id,
+      attendees: userId
+    }) : 0
+  ]);
 
-    return {
-        attending,
-        ownership,
-        total
-    }
-}
+  return { nextEvent, total, totalAttendings };
+};
