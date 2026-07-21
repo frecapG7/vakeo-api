@@ -1,8 +1,9 @@
 import express from "express";
+import passport from "passport";
 import { getTrip, createTrip, deleteTrip, updateTrip, dashboard, search } from "../services/tripService.mjs";
 import { createTripUser, createTripUsers, getTripUserById } from "../services/tripUserService.mjs";
 import { generateJWT } from "../services/tokenService.mjs";
-import {encodeId} from "../services/idEncoderService.mjs";
+import { encodeId } from "../services/idEncoderService.mjs";
 import { verifyUser } from "../services/validationService.mjs";
 import { ForbiddenError, InvalidError } from "../utils/errors.mjs";
 
@@ -138,18 +139,21 @@ app.get("/:id/share", async (req, res) => {
 });
 
 
-app.get("/:id/dashboard", async (req, res) => {
-  const trip = await getTrip(req.params.id);
+app.get("/:id/dashboard",
+  passport.authenticate('user-header', { session: false, failWithError: false }),
+  async (req, res) => {
+    const trip = await getTrip(req.params.id);
+    const userId = req.user?._id;
 
+    if (trip.isPrivate) {
+      if (!userId) throw new ForbiddenError("Private trip requires authenticated user");
+      verifyUser(trip, { _id: userId });
+    }
 
-  const { user } = req.query;
-
-
-  await verifyUser(trip, { _id: user });
-
-  const result = await dashboard(trip);
-  return res.status(200).json(result);
-});
+    const result = await dashboard(trip, userId);
+    return res.status(200).json(result);
+  }
+);
 
 
 
