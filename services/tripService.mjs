@@ -2,6 +2,7 @@ import Trip from "../models/tripModel.mjs";
 import TripStop from "../models/tripStopModel.mjs";
 import Good from "../models/goodModel.mjs";
 import Event from "../models/eventModel.mjs";
+import {Poll} from "../models/pollModel.mjs";
 import { NotFoundError } from "../utils/errors.mjs";
 import { verifyDates } from "./validationService.mjs";
 import { createTripUser } from "./tripUserService.mjs";
@@ -89,16 +90,18 @@ export const deleteTrip = async (id) => {
 
 
 export const dashboard = async (trip, userId) => {
-  const [stopsData, goodsData, eventsData] = await Promise.all([
+  const [stopsData, goodsData, eventsData, pollsData] = await Promise.all([
     stops(trip),
     goods(trip),
     events(trip, userId),
+    polls(trip, userId),
   ]);
 
   return {
     stops: stopsData,
     goods: goodsData,
     events: eventsData,
+    polls: pollsData,
   };
 }
 
@@ -141,4 +144,51 @@ const events = async (trip, userId) => {
   ]);
 
   return { nextEvent, total, totalAttendings };
+};
+
+const polls = async (trip, userId) => {
+  const tripId = trip._id;
+
+  const [stopPollExists, datePollExists] = await Promise.all([
+    Poll.exists({
+      trip: tripId,
+      isClosed: false,
+      type: { $in: ['HousingPoll', 'OtherPoll'] }
+    }),
+    Poll.exists({
+      trip: tripId,
+      isClosed: false,
+      type: 'DatesPoll'
+    })
+  ]);
+
+  let hasPendingStopPoll = false;
+  let hasPendingDatePoll = false;
+
+  if (userId) {
+    const [pendingStopPollExists, pendingDatePollExists] = await Promise.all([
+      Poll.exists({
+        trip: tripId,
+        isClosed: false,
+        type: { $in: ['HousingPoll', 'OtherPoll'] },
+        hasSelected: { $nin: [userId] }
+      }),
+      Poll.exists({
+        trip: tripId,
+        isClosed: false,
+        type: 'DatesPoll',
+        hasSelected: { $nin: [userId] }
+      })
+    ]);
+
+    hasPendingStopPoll = pendingStopPollExists !== null;
+    hasPendingDatePoll = pendingDatePollExists !== null;
+  }
+
+  return {
+    hasStopPoll: stopPollExists !== null,
+    hasPendingStopPoll,
+    hasDatePoll: datePollExists !== null,
+    hasPendingDatePoll
+  };
 };
