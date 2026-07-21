@@ -1,4 +1,4 @@
-import { InvalidError } from "../utils/errors.mjs";
+import { InvalidError, ForbiddenError } from "../utils/errors.mjs";
 
 
 export const verifyDates = (startDate, endDate) => {
@@ -19,5 +19,5 @@ export const verifyDates = (startDate, endDate) => {
 
 export const verifyUser = (trip, user) => {
     if (!trip.users.includes(user?._id))
-        throw new Error(`Users ${user?._id} is not part of trip ${trip._id}`);
+        throw new ForbiddenError(`Users ${user?._id} is not part of trip ${trip._id}`);
 }

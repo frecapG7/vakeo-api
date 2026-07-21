@@ -134,7 +134,7 @@ const events = async (trip, userId) => {
     Event.countDocuments({ trip: trip._id }),
     Event.findOne(
       { trip: trip._id, startDate: { $gte: now } },
-      null,
+      'name startDate endDate location description',
       { sort: { startDate: 1 } }
     ),
     userId ? Event.countDocuments({
