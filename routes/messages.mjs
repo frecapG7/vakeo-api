@@ -1,9 +1,10 @@
 
 
-import { createMessage, deleteMessage, search } from "../services/messageService.mjs";
+import { createMessage, deleteMessage, search, getHubConversations } from "../services/messageService.mjs";
 
 
 import express from "express";
+import passport from "passport";
 import { getTrip } from "../services/tripService.mjs";
 import { verifyUser } from "../services/validationService.mjs";
 const app = express();
@@ -13,9 +14,9 @@ app.get("/trips/:id/messages", async (req, res) => {
 
     const tripId = req.params.id;
 
-    const { cursor, limit = 10 } = req.query;
+    const { cursor, limit = 10, eventId } = req.query;
    
-    const messages = await search(tripId, cursor, limit);
+    const messages = await search(tripId, cursor, limit, eventId);
 
 
     const prevCursor = messages.length > 0 ? messages[0]._id : null;
@@ -30,6 +31,12 @@ app.get("/trips/:id/messages", async (req, res) => {
 
 });
 
+app.get("/trips/:id/conversations", async (req, res) => {
+    const conversations = await getHubConversations(req.params.id);
+    console.log(conversations?.length ?? 5)
+    return res.status(200).json({ conversations });
+});
+
 
 app.post("/trips/:id/messages", async (req, res) => {
     const trip = await getTrip(req.params.id);
@@ -39,6 +46,20 @@ app.post("/trips/:id/messages", async (req, res) => {
     const savedMessage = await createMessage(trip, req.body); 
     return res.status(201).json();
 });
+
+// V2 route with passport auth (x-user-id header)
+app.post("/v2/trips/:id/messages", 
+    passport.authenticate('user-header', { session: false }),
+    async (req, res) => {
+        const trip = await getTrip(req.params.id);
+        verifyUser(trip, req.user._id);
+        const savedMessage = await createMessage(trip, { 
+            ...req.body, 
+            user: req.user._id 
+        });
+        return res.status(201).json();
+    }
+);
 
 
 app.delete("/trips/:id/messages/:messageId", async (req, res) => {
