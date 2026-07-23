@@ -15,7 +15,8 @@ export const createMessage = async (trip, { text = "", user, event = null }) => 
         text,
         trip,
         user,
-        event
+        event,
+        readBy: [{ user }]
     });
     return await message.save();
 }
@@ -35,7 +36,7 @@ export const search = async (tripId, cursor, limit, eventId = null) => {
         limit = 100;
     }
 
-    const messages = await Message.find(query, 'text createdAt', {
+    const messages = await Message.find(query, 'text createdAt readBy', {
         limit,
         sort: {
             createdAt: -1
@@ -57,19 +58,47 @@ export const deleteMessage = async (tripId, messageId, userId) => {
     return;
 }
 
-export const getHubConversations = async (tripId) => {
-     // Convert tripId to ObjectId if it's a string
+export const markAllMessagesAsRead = async (tripId, eventId = null, userId) => {
+    const filter = { 
+        trip: tripId,
+        event: eventId
+    
+    };
+    await Message.updateMany(
+        {
+            ...filter,
+            readBy: { $not: { $elemMatch: { user: userId } } }
+        },
+        {
+            $push: { readBy: { user: userId } }
+        }
+    );
+};
+
+export const getHubConversations = async (tripId, userId = null) => {
     const tripObjectId = mongoose.Types.ObjectId.isValid(tripId)
         ? new mongoose.Types.ObjectId(tripId)
         : tripId;
-    // Single efficient aggregation with $lookup to join Event and TripUser
-    console.log(tripId);
+
+    const unreadMatch = userId
+        ? { $not: { $elemMatch: { "readBy.user": new mongoose.Types.ObjectId(userId) } } }
+        : { $expr: false };
+
+    const unreadCondition = userId
+        ? {
+            "readBy": {
+                $not: {
+                    $elemMatch: {
+                        user: new mongoose.Types.ObjectId(userId)
+                    }
+                }
+            }
+        }
+        : {};
+
     const results = await Message.aggregate([
-        // Match messages for this trip
-        { $match: { trip: tripObjectId  } },
-        // Sort by createdAt descending (so $first in group gets latest)
+        { $match: { trip: tripObjectId } },
         { $sort: { createdAt: -1 } },
-        // Group by event to get latest message per conversation
         {
             $group: {
                 _id: "$event",
@@ -77,7 +106,6 @@ export const getHubConversations = async (tripId) => {
                 lastMessageUserId: { $first: "$user" }
             }
         },
-        // Lookup Event data for title
         {
             $lookup: {
                 from: "events",
@@ -86,7 +114,6 @@ export const getHubConversations = async (tripId) => {
                 as: "eventData"
             }
         },
-        // Lookup TripUser data for user info
         {
             $lookup: {
                 from: "tripusers",
@@ -95,12 +122,30 @@ export const getHubConversations = async (tripId) => {
                 as: "userData"
             }
         },
-        // Unwind the arrays (they have at most 1 element each)
+        {
+            $lookup: {
+                from: "messages",
+                let: { eventId: "$_id" },
+                pipeline: [
+                    {
+                        $match: {
+                            $expr: {
+                                $and: [
+                                    { $eq: ["$trip", tripObjectId] },
+                                    { $eq: ["$event", "$$eventId"] },
+                                ]
+                            },
+                            ...unreadCondition
+                        }
+                    },
+                    { $count: "count" }
+                ],
+                as: "unread"
+            }
+        },
         { $unwind: { path: "$eventData", preserveNullAndEmptyArrays: true } },
         { $unwind: { path: "$userData", preserveNullAndEmptyArrays: true } },
-        // Sort by lastMessageDate descending
         { $sort: { "lastMessage.createdAt": -1 } },
-        // Project final shape
         {
             $project: {
                 _id: 0,
@@ -108,10 +153,15 @@ export const getHubConversations = async (tripId) => {
                 title: { $ifNull: ["$eventData.name", "General"] },
                 lastMessage: "$lastMessage.text",
                 lastMessageDate: "$lastMessage.createdAt",
-                lastMessageUser: "$userData"
+                lastMessageUser: "$userData",
+                unreadCount: { $ifNull: [{ $arrayElemAt: ["$unread.count", 0] }, 0] }
             }
         }
     ]);
+
+    if (!userId) {
+        return results.map(({ unreadCount, ...rest }) => rest);
+    }
 
     return results;
 }

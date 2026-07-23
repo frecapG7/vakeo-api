@@ -1,5 +1,6 @@
 import passport from "passport";
-import { HeaderAPIKeyStrategy } from "passport-headerapikey";
+import { HeaderAPIKeyStrategy  } from "passport-headerapikey";
+import AnonymousStrategy from "passport-anonymous";
 import config from "../config.mjs";
 import TripUser from "../models/tripUserModel.mjs";
 import mongoose from "mongoose";
@@ -40,5 +41,7 @@ passport.use(
     }
   )
 );
+
+passport.use(new AnonymousStrategy());
 
 export default passport;

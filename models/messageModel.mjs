@@ -21,7 +21,18 @@ const modelSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "Event",
         required: false
-    }
+    },
+    readBy: [{
+        user: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "TripUser",
+            required: true
+        },
+        readAt: {
+            type: Date,
+            default: Date.now
+        }
+    }]
 }, {
     timestamps: true
 });
@@ -30,6 +41,13 @@ const modelSchema = new mongoose.Schema({
 modelSchema.index({ trip: 1, createdAt: -1 });
 modelSchema.index({ event: 1, createdAt: -1 });
 
+
+modelSchema.static('markAsRead', async function(messageId, userId) {
+  await this.updateOne(
+    { _id: messageId, readBy: { $not: { $elemMatch: { user: userId } } } },
+    { $push: { readBy: { user: userId } } }
+  );
+});
 
 const Message = mongoose.model("Message", modelSchema);
 

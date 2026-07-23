@@ -1,6 +1,6 @@
 
 
-import { createMessage, deleteMessage, search, getHubConversations } from "../services/messageService.mjs";
+import { createMessage, deleteMessage, search, getHubConversations, markAllMessagesAsRead } from "../services/messageService.mjs";
 
 
 import express from "express";
@@ -31,11 +31,14 @@ app.get("/trips/:id/messages", async (req, res) => {
 
 });
 
-app.get("/trips/:id/conversations", async (req, res) => {
-    const conversations = await getHubConversations(req.params.id);
-    console.log(conversations?.length ?? 5)
-    return res.status(200).json({ conversations });
-});
+app.get("/trips/:id/conversations",
+    passport.authenticate(['user-header', 'anonymous'], { session: false, failWithError: false }),
+    async (req, res) => {
+        const userId = req.user?._id || null;
+        const conversations = await getHubConversations(req.params.id, userId);
+        return res.status(200).json({ conversations });
+    }
+);
 
 
 app.post("/trips/:id/messages", async (req, res) => {
@@ -66,5 +69,20 @@ app.delete("/trips/:id/messages/:messageId", async (req, res) => {
     const message = await deleteMessage(req.params.id, req.params.messageId, req.query.user);
     return res.status(200).json();
 });
+
+// Mark all messages in a trip (or event) as read
+app.post("/trips/:id/messages/markAllAsRead",
+    passport.authenticate('user-header', { session: false }),
+    async (req, res) => {
+        try {
+            const { id: tripId } = req.params;
+            const { eventId } = req.query;
+            await markAllMessagesAsRead(tripId, eventId, req.user._id);
+            return res.status(200).json({ success: true });
+        } catch (error) {
+            return res.status(500).json({ error: error.message });
+        }
+    }
+);
 
 export default app;
