@@ -38,15 +38,14 @@ const modelSchema = new mongoose.Schema({
 });
 
 // Add indexes for performance
-modelSchema.index({ trip: 1, createdAt: -1 });
-modelSchema.index({ event: 1, createdAt: -1 });
+modelSchema.index({ trip: 1, event: 1, createdAt: -1 });
 
 
-modelSchema.static('markAsRead', async function(messageId, userId) {
-  await this.updateOne(
-    { _id: messageId, readBy: { $not: { $elemMatch: { user: userId } } } },
-    { $push: { readBy: { user: userId } } }
-  );
+modelSchema.static('markAsRead', async function (messageId, userId) {
+    await this.updateOne(
+        { _id: messageId, readBy: { $not: { $elemMatch: { user: userId } } } },
+        { $push: { readBy: { user: userId } } }
+    );
 });
 
 const Message = mongoose.model("Message", modelSchema);

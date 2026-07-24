@@ -27,7 +27,6 @@ export const search = async (tripId, cursor, limit, eventId = null) => {
         event: eventId
     };
 
-
     if (cursor)
         query._id = { $lt: cursor }
 
@@ -53,8 +52,6 @@ export const deleteMessage = async (tripId, messageId, userId) => {
         trip: tripId,
         user: userId
     });
-    if (!message)
-        throw new Error(`Cannot delete message ${messageId}`)
     return;
 }
 
@@ -74,6 +71,50 @@ export const markAllMessagesAsRead = async (tripId, eventId = null, userId) => {
         }
     );
 };
+
+export const getUnreadConversationCount = async (tripId, userId) => {
+    const tripObjectId = mongoose.Types.ObjectId.isValid(tripId)
+        ? new mongoose.Types.ObjectId(tripId)
+        : tripId;
+
+    const userObjectId = mongoose.Types.ObjectId.isValid(userId)
+        ? new mongoose.Types.ObjectId(userId)
+        : userId;
+
+    const conversationsWithUnread = await Message.aggregate([
+        { $match: { trip: tripObjectId } },
+        {
+            $group: {
+                _id: "$event",
+                hasUnread: {
+                    $sum: {
+                        $cond: [
+                            {
+                                $eq: [
+                                    { $size: {
+                                        $filter: {
+                                            input: "$readBy",
+                                            as: "r",
+                                            cond: { $eq: ["$$r.user", userObjectId] }
+                                        }
+                                    }},
+                                    0
+                                ]
+                            },
+                            1,
+                            0
+                        ]
+                    }
+                }
+            }
+        },
+        { $match: { hasUnread: { $gt: 0 } } },
+        { $count: "count" }
+    ]);
+
+    return conversationsWithUnread.length > 0 ? conversationsWithUnread[0].count : 0;
+}
+
 
 export const getHubConversations = async (tripId, userId = null) => {
     const tripObjectId = mongoose.Types.ObjectId.isValid(tripId)
