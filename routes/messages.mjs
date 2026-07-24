@@ -14,9 +14,9 @@ app.get("/trips/:id/messages", async (req, res) => {
 
     const tripId = req.params.id;
 
-    const { cursor, limit = 10, eventId } = req.query;
+    const { cursor, limit = 10 } = req.query;
 
-    const messages = await search(tripId, cursor, limit, eventId);
+    const messages = await search(tripId, cursor, limit);
 
 
     const prevCursor = messages.length > 0 ? messages[0]._id : null;
@@ -29,6 +29,41 @@ app.get("/trips/:id/messages", async (req, res) => {
         messages
     });
 
+});
+
+// General messages (eventId: null)
+app.get("/trips/:id/messages/general", async (req, res) => {
+    const tripId = req.params.id;
+    const { cursor, limit = 10 } = req.query;
+    const messages = await search(tripId, cursor, limit, null);
+
+    const prevCursor = messages.length > 0 ? messages[0]._id : null;
+    const nextCursor = messages.length > 0 ? messages[messages.length - 1]._id : null;
+
+    return res.status(200).json({
+        nextCursor,
+        prevCursor,
+        totalResults: messages.length,
+        messages
+    });
+});
+
+// Event-specific messages
+app.get("/trips/:id/events/:eventId/messages", async (req, res) => {
+    const tripId = req.params.id;
+    const eventId = req.params.eventId;
+    const { cursor, limit = 10 } = req.query;
+    const messages = await search(tripId, cursor, limit, eventId);
+
+    const prevCursor = messages.length > 0 ? messages[0]._id : null;
+    const nextCursor = messages.length > 0 ? messages[messages.length - 1]._id : null;
+
+    return res.status(200).json({
+        nextCursor,
+        prevCursor,
+        totalResults: messages.length,
+        messages
+    });
 });
 
 app.get("/trips/:id/conversations",
@@ -92,6 +127,30 @@ app.post("/trips/:id/messages/markAllAsRead",
         const trip = await getTrip(tripId);
         verifyUser(trip, req.user);
         const { eventId } = req.query;
+        await markAllMessagesAsRead(tripId, eventId, req.user._id);
+        return res.status(200).json({ success: true });
+    }
+);
+
+// Mark all general messages (eventId: null) as read
+app.post("/trips/:id/messages/general/markAllAsRead",
+    passport.authenticate('user-header', { session: false }),
+    async (req, res) => {
+        const { id: tripId } = req.params;
+        const trip = await getTrip(tripId);
+        verifyUser(trip, req.user);
+        await markAllMessagesAsRead(tripId, null, req.user._id);
+        return res.status(200).json({ success: true });
+    }
+);
+
+// Mark all event-specific messages as read
+app.post("/trips/:id/events/:eventId/messages/markAllAsRead",
+    passport.authenticate('user-header', { session: false }),
+    async (req, res) => {
+        const { id: tripId, eventId } = req.params;
+        const trip = await getTrip(tripId);
+        verifyUser(trip, req.user);
         await markAllMessagesAsRead(tripId, eventId, req.user._id);
         return res.status(200).json({ success: true });
     }

@@ -93,7 +93,7 @@ export const getUnreadConversationCount = async (tripId, userId) => {
                                 $eq: [
                                     { $size: {
                                         $filter: {
-                                            input: "$readBy",
+                                            input: { $ifNull: ["$readBy", []] },
                                             as: "r",
                                             cond: { $eq: ["$$r.user", userObjectId] }
                                         }
