@@ -138,7 +138,7 @@ app.post("/trips/:id/messages/general/markAllAsRead",
         const { id: tripId } = req.params;
         const trip = await getTrip(tripId);
         verifyUser(trip, req.user);
-        await markAllMessagesAsRead(tripId, req.user._id, true);
+        await markAllMessagesAsRead(tripId, req.user._id, null,  true);
         return res.status(200).json({ success: true });
     }
 );
