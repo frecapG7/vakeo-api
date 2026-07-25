@@ -55,11 +55,10 @@ export const deleteMessage = async (tripId, messageId, userId) => {
     return;
 }
 
-export const markAllMessagesAsRead = async (tripId, eventId = null, userId) => {
+export const markAllMessagesAsRead = async (tripId, userId,eventId = null, general = false ) => {
     const filter = { 
         trip: tripId,
-        event: eventId
-    
+        ...(!general && !!eventId && {event: eventId})
     };
     await Message.updateMany(
         {
