@@ -126,8 +126,7 @@ app.post("/trips/:id/messages/markAllAsRead",
         const { id: tripId } = req.params;
         const trip = await getTrip(tripId);
         verifyUser(trip, req.user);
-        const { eventId } = req.query;
-        await markAllMessagesAsRead(tripId, eventId, req.user._id);
+        await markAllMessagesAsRead(tripId, req.user._id);
         return res.status(200).json({ success: true });
     }
 );
@@ -139,7 +138,7 @@ app.post("/trips/:id/messages/general/markAllAsRead",
         const { id: tripId } = req.params;
         const trip = await getTrip(tripId);
         verifyUser(trip, req.user);
-        await markAllMessagesAsRead(tripId, null, req.user._id);
+        await markAllMessagesAsRead(tripId, req.user._id, null,  true);
         return res.status(200).json({ success: true });
     }
 );
@@ -151,7 +150,7 @@ app.post("/trips/:id/events/:eventId/messages/markAllAsRead",
         const { id: tripId, eventId } = req.params;
         const trip = await getTrip(tripId);
         verifyUser(trip, req.user);
-        await markAllMessagesAsRead(tripId, eventId, req.user._id);
+        await markAllMessagesAsRead(tripId, req.user._id, eventId);
         return res.status(200).json({ success: true });
     }
 );
