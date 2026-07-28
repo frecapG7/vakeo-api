@@ -1,7 +1,7 @@
 
 import express from "express";
 import { getTrip } from "../services/tripService.mjs";
-import { checkGood, createGood, getCount, getGood, getNames, getSummary, search,  updateGood } from "../services/goodsService.mjs";
+import { checkGood, createGood, deleteGood, getCount, getGood, getNames, getSummary, search,  updateGood } from "../services/goodsService.mjs";
 
 const app = express();
 
@@ -64,8 +64,7 @@ app.delete("/trips/:tripId/goods/:goodId", async (req, res) => {
     const {tripId, goodId} = req.params;
 
     const good = await getGood(tripId, goodId);
-    await good.deleteOne();
-
+    await deleteGood(good);
     return res.status(204).json({});
 
 })

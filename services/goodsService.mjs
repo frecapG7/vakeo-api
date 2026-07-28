@@ -1,6 +1,29 @@
 import Good from "../models/goodModel.mjs";
 import { InvalidError, NotFoundError } from "../utils/errors.mjs";
 import { verifyUser } from "./validationService.mjs";
+import Event from "../models/eventModel.mjs";
+
+/**
+ * Goods Service
+ *
+ * Manages goods (items) and maintains accurate goodsCount on related Events.
+ * Uses countDocuments() for accuracy rather than $inc to avoid inconsistencies.
+ * All count updates are handled through updateEventGoodsCount() helper.
+ */
+
+// Helper function to update an event's goods count
+const updateEventGoodsCount = async (eventId, tripId) => {
+    if (!eventId) return;
+
+    const count = await Good.countDocuments({
+        event: eventId,
+        trip: tripId
+    });
+
+    await Event.findByIdAndUpdate(eventId, {
+        goodsCount: count
+    });
+};
 
 export const getGood = async (tripId, goodId) => {
     const good = await Good.findOne({
@@ -138,7 +161,11 @@ export const createGood = async (trip, { name, quantity, createdBy, event }) => 
         trip,
     });
 
-    return await newGood.save();
+    const savedGood =  await newGood.save();
+      // Update the event's goods count if this good is linked to an event
+    await updateEventGoodsCount(event, trip._id);
+
+    return savedGood;
 }
 
 export const updateGood = async (good, { name, quantity }) => {
@@ -154,4 +181,16 @@ export const updateGood = async (good, { name, quantity }) => {
 export const checkGood = async (good) => {
     good.checked = !good.checked;
     return good.save();
+}
+
+
+export const deleteGood = async (good) => {
+    const tripId = good.trip;
+    const eventId = good.event;
+
+    // Delete the good
+    await good.deleteOne();
+
+    // Update the event's goods count if the good was linked to an event
+    await updateEventGoodsCount(eventId, tripId);
 }

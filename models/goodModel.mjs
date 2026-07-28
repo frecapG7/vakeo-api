@@ -31,4 +31,11 @@ const goodSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
+// Add indexes for faster counting and querying
+goodSchema.index({ event: 1 });          // For counting goods by event
+goodSchema.index({ trip: 1 });           // For counting goods by trip
+goodSchema.index({ trip: 1, event : 1, checked: 1 });   // For counting goods by trip & event & checked
+goodSchema.index({ event: 1, checked: 1 }); // For counting checked/unchecked goods by event
+goodSchema.index({ trip: 1, name: 1 });  // For name-based searches within a trip
+
 export default mongoose.model("Good", goodSchema);
