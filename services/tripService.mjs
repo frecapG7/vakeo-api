@@ -5,6 +5,7 @@ import Event from "../models/eventModel.mjs";
 import {Poll} from "../models/pollModel.mjs";
 import { NotFoundError } from "../utils/errors.mjs";
 import { verifyDates } from "./validationService.mjs";
+import TripUser from "../models/tripUserModel.mjs";
 import { createTripUser } from "./tripUserService.mjs";
 
 export const search = async ({ ids, search }) => {
@@ -90,11 +91,12 @@ export const deleteTrip = async (id) => {
 
 
 export const dashboard = async (trip, userId) => {
-  const [stopsData, goodsData, eventsData, pollsData] = await Promise.all([
+  const [stopsData, goodsData, eventsData, pollsData, usersData] = await Promise.all([
     stops(trip),
     goods(trip),
     events(trip, userId),
     polls(trip, userId),
+    users(trip),
   ]);
 
   return {
@@ -102,6 +104,7 @@ export const dashboard = async (trip, userId) => {
     goods: goodsData,
     events: eventsData,
     polls: pollsData,
+    users: usersData,
   };
 }
 
@@ -144,6 +147,16 @@ const events = async (trip, userId) => {
   ]);
 
   return { nextEvent, total, totalAttendings };
+};
+
+const users = async (trip) => {
+  const result = await TripUser.aggregate([
+    { $match: { _id: { $in: trip.users } } },
+    { $unwind: "$restrictions" },
+    { $group: { _id: null, unique: { $addToSet: "$restrictions" } } },
+    { $project: { restrictionCount: { $size: "$unique" } } }
+  ]);
+  return { restrictionCount: result[0]?.restrictionCount || 0 };
 };
 
 const polls = async (trip, userId) => {

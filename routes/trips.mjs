@@ -1,6 +1,7 @@
 import express from "express";
 import passport from "passport";
 import { getTrip, createTrip, deleteTrip, updateTrip, dashboard, search } from "../services/tripService.mjs";
+import TripUser from "../models/tripUserModel.mjs";
 import { createTripUser, createTripUsers, getTripUserById } from "../services/tripUserService.mjs";
 import { generateJWT } from "../services/tokenService.mjs";
 import { encodeId } from "../services/idEncoderService.mjs";
@@ -48,6 +49,12 @@ app.delete("/:id", async (req, res) => {
   const trip = await deleteTrip(req.params.id);
   return res.status(200);
 })
+
+app.get("/:id/users", async (req, res) => {
+  const trip = await getTrip(req.params.id);
+  const users = await TripUser.find({ _id: { $in: trip.users } });
+  return res.status(200).json(users);
+});
 
 app.post("/:id/users", async (req, res) => {
 
