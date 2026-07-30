@@ -1,8 +1,7 @@
 import express from "express";
 import passport from "passport";
 import { getTrip, createTrip, deleteTrip, updateTrip, dashboard, search } from "../services/tripService.mjs";
-import TripUser from "../models/tripUserModel.mjs";
-import { createTripUser, createTripUsers, getTripUserById } from "../services/tripUserService.mjs";
+import { createTripUsers } from "../services/tripUserService.mjs";
 import { generateJWT } from "../services/tokenService.mjs";
 import { encodeId } from "../services/idEncoderService.mjs";
 import { verifyUser } from "../services/validationService.mjs";
@@ -49,87 +48,6 @@ app.delete("/:id", async (req, res) => {
   const trip = await deleteTrip(req.params.id);
   return res.status(200);
 })
-
-app.get("/:id/users", async (req, res) => {
-  const trip = await getTrip(req.params.id);
-  const users = await TripUser.find({ _id: { $in: trip.users } });
-  return res.status(200).json(users);
-});
-
-app.post("/:id/users", async (req, res) => {
-
-  const trip = await getTrip(req.params.id);
-  if (trip.isPrivate)
-    throw new ForbiddenError("Cannot add user on private trip");
-
-  const newUser = await createTripUser(req.body);
-  trip.users.push(newUser._id);
-
-  const savedTrip = await trip.save();
-
-  await savedTrip.populate("users");
-
-  return res.status(200).json(savedTrip);
-
-});
-
-app.put("/:id/users", async (req, res) => {
-
-  const trip = await getTrip(req.params.id);
-
-  const users = req.body.users.map(async (user) => {
-    let dbUser
-    if (user._id) {
-      if (!trip.users.includes(user._id))
-        throw new Error(`Cannot update list of users: user ${user._id} is no part of the trip ${trip._id}`);
-      dbUser = await getTripUserById(user._id);
-    } else {
-      dbUser = await createTripUser(user);
-      trip.users.push(dbUser);
-    }
-    dbUser.name = user.name;
-    dbUser.avatar = user.avatar;
-    return await dbUser.save();
-  });
-
-  const savedUsers = await Promise.all(users);
-  await trip.save();
-
-  return res.status(200).json(savedUsers);
-
-});
-
-
-app.get("/:id/users/:tripUserId", async (req, res) => {
-
-  const trip = await getTrip(req.params.id);
-  if (!trip.users.includes(req.params.tripUserId))
-    throw new Error(`Error accessing trip user: user ${req.params.tripUserId} is no part of the trip ${trip._id}`);
-
-  const user = await getTripUserById(req.params.tripUserId);
-
-  return res.status(200).json(user);
-});
-
-app.put("/:id/users/:tripUserId", async (req, res) => {
-
-
-  const tripUserId = req.params.tripUserId;
-  const trip = await getTrip(req.params.id);
-  if (!trip.users.includes(tripUserId))
-    throw new Error(`Error accessing trip user: user ${tripUserId} is no part of the trip ${trip._id}`);
-
-
-  const user = await getTripUserById(tripUserId);
-
-  const { name, avatar, restrictions } = req.body;
-  user.name = name;
-  user.avatar = avatar;
-  user.restrictions = restrictions;
-
-  const savedUser = await user.save();
-  return res.status(200).json(savedUser);
-});
 
 app.post("/:id/share", async (req, res) => {
   const trip = await getTrip(req.params.id);
