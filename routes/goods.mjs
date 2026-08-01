@@ -144,7 +144,7 @@ app.put("/v2/trips/:tripId/goods/checked", passport.authenticate('user-header', 
     const trip = await getTrip(tripId);
     verifyUser(trip, req.user);
 
-    const { event, createdBy, checked = true } = req.query;
+    const { event, createdBy} = req.query;
     const result = await checkMultipleGoods(tripId, { event, createdBy });
     return res.status(200).json(result);
 });
@@ -177,31 +177,6 @@ app.put("/v2/trips/:tripId/goods/:goodId", passport.authenticate('user-header', 
     const newGood = await updateGood(good, req.body);
     return res.status(200).json(newGood);
 });
-
-/****************************************************************
- *                      DEPRECATED ENDPOINTS
- * **************************************************************
- */
-app.get("/trips/:tripId/goods/summary", async (req, res) => {
-    const summary = await getSummary(req)
-    return res.status(200).json(summary);
-});
-
-app.get("/trips/:tripId/goods/names", async (req, res) => {
-    const { tripId } = req.params;
-    const { search } = req.query;
-    const names = await getNames(tripId, search);
-    return res.status(200).json(names);
-});
-
-
-app.get("/trips/:tripId/goods/count", async (req, res) => {
-    const { tripId } = req.params;
-    const { event } = req.query;
-
-    const count = await getCount(tripId, event);
-    return res.status(200).json(count);
-})
 
 /****************************************************************
  *                      PROTECTED METHODS
