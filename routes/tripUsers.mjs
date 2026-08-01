@@ -71,18 +71,22 @@ app.put("/trips/:tripId/users",
       verifyUser(trip, { _id: userId });
     }
 
+    const newUserCount = req.body.users.filter(u => !u._id).length;
+    if (trip.users.length + newUserCount > 20)
+      throw new InvalidError("Cannot add user: trip already has the maximum number of users");
+
     const users = req.body.users.map(async (user) => {
       let dbUser;
       if (user._id) {
-        if (!trip.users.includes(user._id))
-          throw new Error(`Cannot update list of users: user ${user._id} is no part of the trip ${trip._id}`);
+        if (!trip.users.some(u => u.toString() === String(user._id)))
+          throw new ForbiddenError(`Cannot update list of users: user ${user._id} is no part of the trip ${trip._id}`);
         dbUser = await getTripUserById(user._id);
       } else {
         dbUser = await createTripUser(user);
-        trip.users.push(dbUser);
+        trip.users.push(dbUser._id);
       }
-      dbUser.name = user.name;
-      dbUser.avatar = user.avatar;
+      dbUser.name = user.name ?? dbUser.name;
+      dbUser.avatar = user.avatar ?? dbUser.avatar;
       return await dbUser.save();
     });
 
@@ -132,8 +136,8 @@ app.put("/trips/:tripId/users/:tripUserId",
     const trip = await getTrip(req.params.tripId);
     verifyUser(trip, req.user);
 
-    if (!trip.users.includes(tripUserId))
-      throw new Error(`Error accessing trip user: user ${tripUserId} is no part of the trip ${trip._id}`);
+    if (!trip.users.some(u => u.toString() === String(tripUserId)))
+      throw new ForbiddenError(`Error accessing trip user: user ${tripUserId} is no part of the trip ${trip._id}`);
 
     const user = await getTripUserById(tripUserId);
 
