@@ -1,6 +1,7 @@
 import express from "express";
 import trips from "./trips.mjs";
 import tripStops from "./tripStops.mjs";
+import tripUsers from "./tripUsers.mjs";
 import messages from "./messages.mjs";
 import tokens from "./tokens.mjs";
 import events from "./events.mjs";
@@ -13,6 +14,7 @@ const app = express();
 
 app.use("/trips", trips);
 app.use(tripStops);
+app.use(tripUsers);
 app.use(messages)
 
 
