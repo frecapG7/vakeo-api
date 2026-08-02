@@ -136,7 +136,6 @@ app.put("/v2/trips/:tripId/goods/:goodId/checked", passport.authenticate('user-h
  * @param {string} tripId - Trip ID
  * @query {string} event - Filter by event ID
  * @query {string} createdBy - Filter by creator ID
- * @query {boolean} checked - Value to set (default: true)
  * @returns {object} - Update result with matched/modified counts
  */
 app.put("/v2/trips/:tripId/goods/checked", passport.authenticate('user-header', { session: false }), async (req, res) => {
