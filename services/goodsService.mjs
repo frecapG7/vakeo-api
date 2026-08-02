@@ -6,7 +6,10 @@ export const getGood = async (tripId, goodId) => {
     const good = await Good.findOne({
         _id: goodId,
         trip: tripId,
-    }).populate("createdBy event");
+    }).populate([
+        { path: "createdBy", select: "name avatar" },
+        { path: "event", select: "name type" }
+    ]);
     if (!good)
         throw new NotFoundError("Cannot find good");
 
@@ -54,13 +57,62 @@ export const search = async (tripId, { search = "", cursor, limit = 10, event, u
         }
     };
 
-    const goods = await Good.find(query, null, options).populate("createdBy event");
+    const goods = await Good.find(query, null, options).populate([
+        { path: "createdBy", select: "name avatar" },
+        { path: "event", select: "name type" }
+    ]);
     return goods;
 }
 
 
 
-export const getSummary = async ({ params: { tripId }, query: {event}, }) => {
+export const createGood = async (trip, { name, quantity, quantityNumber, unit, createdBy, event }) => {
+
+    verifyUser(trip, createdBy);
+
+    const newGood = new Good({
+        name: name?.toLowerCase(),
+        //@deprecated
+        quantity,
+        quantityNumber,
+        unit,
+        createdBy,
+        ...(event && { event }),
+        trip,
+    });
+
+    return await newGood.save();
+}
+
+export const updateGood = async (good, { name, quantity, quantityNumber, unit }) => {
+    if (good?.checked)
+        throw new InvalidError("Cannot updated checked good");
+
+    good.name = name?.toLowerCase();
+    //@deprecated
+    good.quantity = quantity;
+    good.quantityNumber = quantityNumber;
+    good.unit = unit;
+    return await good.save();
+}
+
+
+export const checkGood = async (good) => {
+    good.checked = !good.checked;
+    return good.save();
+}
+
+export const checkMultipleGoods = async (tripId, { event, createdBy }) => {
+    const query = { trip: tripId, checked: false };
+    if (event) query.event = event;
+    if (createdBy) query.createdBy = createdBy;
+    return Good.updateMany(query, { checked: true });
+}
+
+
+// ***************** DEPRECATED *****************
+
+export const getSummary = async ({ params: { tripId }, query: { event }, }) => {
     const baseQuery = {
         trip: tripId,
         event,
@@ -74,8 +126,6 @@ export const getSummary = async ({ params: { tripId }, query: {event}, }) => {
     const goods = await Good.find(baseQuery, null, {
         limit: 4,
     });
-
-
     return {
         totalCount,
         checkedCount,
@@ -86,7 +136,6 @@ export const getSummary = async ({ params: { tripId }, query: {event}, }) => {
 }
 
 export const getNames = async (tripId, search = "") => {
-
     const query = {
         trip: tripId,
         name: { $regex: search, $options: "i" }
@@ -103,9 +152,7 @@ export const getNames = async (tripId, search = "") => {
     return goods;
 }
 
-
 export const getCount = async (tripId, event) => {
-
     const query = {
         trip: tripId,
         ...(event && { event })
@@ -118,40 +165,9 @@ export const getCount = async (tripId, event) => {
 
     const totalCount = await Good.countDocuments(query);
 
-
     return {
         checkedCount,
         totalCount
     };
 
-}
-
-export const createGood = async (trip, { name, quantity, createdBy, event }) => {
-
-    verifyUser(trip, createdBy);
-
-    const newGood = new Good({
-        name: name?.toLowerCase(),
-        quantity,
-        createdBy,
-        ...(event && { event }),
-        trip,
-    });
-
-    return await newGood.save();
-}
-
-export const updateGood = async (good, { name, quantity }) => {
-    if (good?.checked)
-        throw new InvalidError("Cannot updated checked good");
-
-    good.name = name;
-    good.quantity = quantity;
-    return good.save();
-}
-
-
-export const checkGood = async (good) => {
-    good.checked = !good.checked;
-    return good.save();
 }

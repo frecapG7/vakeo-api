@@ -6,10 +6,30 @@ const goodSchema = new mongoose.Schema({
         required: true,
         maxLength: 155
     },
+    //@deprecated
     quantity: {
         type: String,
         default: "",
         maxLength: 155
+    },
+    quantityNumber: {
+        type: Number,
+        validate: {
+            validator: function(value) {
+                return value == null || this.unit != null;
+            },
+            message: "unit is required when a quantityNumber is defined"
+        }  
+    },
+    unit: {
+        type: String,
+        maxLength: 50,
+        validate: {
+            validator: function(value) {
+                return value == null || this.quantityNumber != null;
+            },
+            message: "quantityNumber is required when an unit is defined"
+        }
     },
     checked: {
         type: Boolean,
