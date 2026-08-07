@@ -101,35 +101,6 @@ app.delete("/v2/trips/:tripId/goods/:goodId", passport.authenticate('user-header
     return res.status(204).json({});
 });
 
-
-/**
- * PUT /trips/:tripId/goods/:goodId/checked
- * Toggle checked status of a good
- * @param {string} tripId - Trip ID
- * @param {string} goodId - Good ID
- * @returns {object} - The updated good
- */
-app.put("/trips/:tripId/goods/:goodId/checked", async (req, res) => {
-    const { tripId, goodId } = req.params;
-
-    const good = await getGood(tripId, goodId);
-
-    const newGood = await checkGood(good);
-    return res.status(200).json(newGood);
-});
-
-//@deprecated
-app.put("/v2/trips/:tripId/goods/:goodId/checked", passport.authenticate('user-header', { session: false }), async (req, res) => {
-    const { tripId, goodId } = req.params;
-    const trip = await getTrip(tripId);
-    verifyUser(trip, req.user);
-
-    const good = await getGood(tripId, goodId);
-
-    const newGood = await checkGood(good);
-    return res.status(200).json(newGood);
-});
-
 /**
  * PUT /v2/trips/:tripId/goods/checked
  * Mark multiple goods as checked (auth required)
@@ -148,6 +119,33 @@ app.put("/v2/trips/:tripId/goods/checked", passport.authenticate('user-header', 
     return res.status(200).json(result);
 });
 
+//@deprecated
+app.put("/trips/:tripId/goods/:goodId/checked", async (req, res) => {
+    const { tripId, goodId } = req.params;
+
+    const good = await getGood(tripId, goodId);
+
+    const newGood = await checkGood(good);
+    return res.status(200).json(newGood);
+});
+
+/**
+ * PUT /trips/:tripId/goods/:goodId/checked
+ * Toggle checked status of a good
+ * @param {string} tripId - Trip ID
+ * @param {string} goodId - Good ID
+ * @returns {object} - The updated good
+ */
+app.put("/v2/trips/:tripId/goods/:goodId/checked", passport.authenticate('user-header', { session: false }), async (req, res) => {
+    const { tripId, goodId } = req.params;
+    const trip = await getTrip(tripId);
+    verifyUser(trip, req.user);
+
+    const good = await getGood(tripId, goodId);
+
+    const newGood = await checkGood(good);
+    return res.status(200).json(newGood);
+});
 
 //@deprecated
 app.put("/trips/:tripId/goods/:goodId", async (req, res) => {
