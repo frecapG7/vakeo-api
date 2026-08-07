@@ -130,7 +130,7 @@ app.put("/trips/:tripId/goods/:goodId/checked", async (req, res) => {
 });
 
 /**
- * PUT /trips/:tripId/goods/:goodId/checked
+ * PUT /v2/trips/:tripId/goods/:goodId/checked
  * Toggle checked status of a good
  * @param {string} tripId - Trip ID
  * @param {string} goodId - Good ID
