@@ -9,14 +9,29 @@ const linkSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
-    image: {
-        type: String,
-        required: false,
-    },
     icon: {
         type: String,
         required: false,
     },
+    image: {
+        type: String,
+        required: false,
+    },
+    description: {
+        type: String,
+        required: false
+    },
+    trip: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Trip",
+        required: true
+
+    },
+    type: {
+        type: String,
+        enum: ['accommodation', 'general'],
+        default: 'general'
+    }
 });
 
-export default linkSchema;
+export default mongoose.model("Link", linkSchema);
