@@ -3,6 +3,7 @@ import passport from "passport";
 import { getTrip } from "../services/tripService.mjs";
 import { verifyUser } from "../services/validationService.mjs";
 import { search, getLink, createLink, updateLink, deleteLink } from "../services/linkService.mjs";
+import { sanitizeLimit } from "../utils/pagination.mjs";
 
 const app = express();
 
@@ -16,11 +17,15 @@ const app = express();
  * @returns {object} - Paginated list of links with next cursor
  */
 app.get("/v2/trips/:tripId/links", async (req, res) => {
-    const { tripId } = req.params; 
+    const { tripId } = req.params;
     const { limit = 10 } = req.query;
-    const links = await search(tripId, req.query);
+    const sanitizedLimit = sanitizeLimit(limit);
+    const links = await search(tripId, {
+        ...req?.query,
+        limit: sanitizedLimit
+    });
 
-    const nextCursor = links.length === limit ? links[links.length - 1]?._id : null;
+    const nextCursor = links.length === sanitizedLimit ? links[links.length - 1]?._id : null;
 
     return res.status(200).json({
         nextCursor,

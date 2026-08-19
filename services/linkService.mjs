@@ -1,16 +1,15 @@
 import Link from "../models/linkModel.mjs";
 import TripStop from "../models/tripStopModel.mjs";
 import { InvalidError, NotFoundError } from "../utils/errors.mjs";
-import { sanitizeLimit } from "../utils/pagination.mjs";
 
-export const search = async (tripId, { cursor, limit = 10, search: searchText }) => {
+export const search = async (tripId, { cursor, limit = 10 }) => {
     let query = { trip: tripId };
 
     if (cursor) {
         query._id = { $lt: cursor };
     }
     const options = {
-        limit: sanitizeLimit(limit),
+        limit,
         sort: { _id: -1 }
     };
 
@@ -33,7 +32,7 @@ export const getLink = async (tripId, id) => {
 };
 
 
-export const createLink = async (trip, { url, title, icon,image, description, type }) => {
+export const createLink = async (trip, { url, title, icon, image, description, type }) => {
     const link = new Link({
         url,
         title,
@@ -48,13 +47,12 @@ export const createLink = async (trip, { url, title, icon,image, description, ty
 };
 
 
-export const updateLink = async (link, { url, title, icon,image, description, type }) => {
+export const updateLink = async (link, { url, title, icon, image, description, type }) => {
     if (url !== undefined) link.url = url;
     if (title !== undefined) link.title = title;
     if (icon !== undefined) link.icon = icon;
     if (description !== undefined) link.description = description;
-    if(image !== undefined) link.image = image;
-    if(type !== undefined) link.type = type;
+    if (image !== undefined) link.image = image;
 
     return await link.save();
 };

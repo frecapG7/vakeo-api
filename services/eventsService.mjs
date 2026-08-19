@@ -1,6 +1,6 @@
 import Event from "../models/eventModel.mjs";
 import { NotFoundError } from "../utils/errors.mjs";
-import { sanitizeLimit, sanitizeSearchText } from "../utils/pagination.mjs";
+import { sanitizeSearchText } from "../utils/pagination.mjs";
 import { verifyDates, verifyUser } from "./validationService.mjs";
 
 export const search = async (tripId, { cursor, limit = 10, type, startDate, endDate, attendee, owner, search }) => {
@@ -51,7 +51,7 @@ export const search = async (tripId, { cursor, limit = 10, type, startDate, endD
     }
 
     const options = {
-        limit: sanitizeLimit(limit),
+        limit,
         sort: {
             startDate: 1
         }

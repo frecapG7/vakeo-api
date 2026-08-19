@@ -4,6 +4,7 @@ import { getTrip } from "../services/tripService.mjs";
 import { checkGood, checkMultipleGoods, createGood, getCount, getGood, getNames, getSummary, search, updateGood } from "../services/goodsService.mjs";
 import { verifyUser } from "../services/validationService.mjs";
 import passport from "passport";
+import { sanitizeLimit } from "../utils/pagination.mjs";
 
 const app = express();
 
@@ -21,9 +22,13 @@ const app = express();
 app.get("/trips/:tripId/goods", async (req, res) => {
     const { tripId } = req.params;
     const {limit } = req?.query;
-    const goods = await search(tripId, req.query);
+    const sanitizedLimit = sanitizeLimit(limit);
+    const goods = await search(tripId, {
+        ...req?.query,
+        limit: sanitizedLimit
+    });
 
-    const nextCursor = goods.length  === limit ? buidCursor(goods[goods.length - 1]) : null;
+    const nextCursor = goods.length === sanitizedLimit ? buidCursor(goods[goods.length - 1]) : null;
 
     return res.status(200).json({
         nextCursor,

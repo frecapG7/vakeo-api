@@ -1,6 +1,6 @@
 import Good from "../models/goodModel.mjs";
 import { InvalidError, NotFoundError } from "../utils/errors.mjs";
-import { sanitizeLimit, sanitizeSearchText } from "../utils/pagination.mjs";
+import { sanitizeSearchText } from "../utils/pagination.mjs";
 import { verifyUser } from "./validationService.mjs";
 
 export const getGood = async (tripId, goodId) => {
@@ -26,9 +26,8 @@ export const search = async (tripId, { search = "", cursor, limit = 10, event, u
     let lastName;
     let lastId;
 
-    const escapedSearch = sanitizeSearchText(search);
-    if (escapedSearch)
-        query.name = { $regex: escapedSearch, $options: "i" };
+    if (search)
+        query.name = { $regex: search, $options: "i" };
 
     if (cursor) {
         const [cursorChecked, cursorName, cursorId] = cursor.split("_");
@@ -52,7 +51,7 @@ export const search = async (tripId, { search = "", cursor, limit = 10, event, u
         query.checked = false;
 
     const options = {
-        limit: sanitizeLimit(limit),
+        limit,
         sort: {
             checked: 1,
             name: 1

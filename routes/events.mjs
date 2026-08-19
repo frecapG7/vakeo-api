@@ -1,6 +1,7 @@
 import express from "express";
 import { getTrip } from "../services/tripService.mjs";
 import { createEvent, getEvent, search, updateEvent } from "../services/eventsService.mjs";
+import { sanitizeLimit } from "../utils/pagination.mjs";
 
 
 
@@ -11,9 +12,13 @@ app.get("/trips/:tripId/events", async (req, res) => {
     const tripId = req.params.tripId;
 
     const {limit = 10} = req?.query;
-    const events = await search(tripId, req?.query);
+    const sanitizedLimit = sanitizeLimit(limit);
+    const events = await search(tripId, {
+        ...req?.query,
+        limit : sanitizedLimit
+    });
 
-    const nextCursor = events?.length === limit ? buildCursor(events[events.length - 1]) : null;
+    const nextCursor = events?.length === sanitizedLimit ? buildCursor(events[events.length - 1]) : null;
 
     return res.status(200).json({
         nextCursor,
