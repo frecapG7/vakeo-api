@@ -4,6 +4,7 @@ import Good from "../models/goodModel.mjs";
 import Event from "../models/eventModel.mjs";
 import {Poll} from "../models/pollModel.mjs";
 import { NotFoundError } from "../utils/errors.mjs";
+import { sanitizeSearchText } from "../utils/pagination.mjs";
 import { verifyDates } from "./validationService.mjs";
 import TripUser from "../models/tripUserModel.mjs";
 import { createTripUser } from "./tripUserService.mjs";
@@ -19,8 +20,9 @@ export const search = async ({ ids, search }) => {
     let query = {
         _id: { $in: searchIds },
     }
-    if (search)
-        query.name = { $regex: search, $options: "i" }
+    const escapedSearch = sanitizeSearchText(search);
+    if (escapedSearch)
+        query.name = { $regex: escapedSearch, $options: "i" }
 
     const trips = await Trip.find(
         query,

@@ -1,6 +1,7 @@
 import Link from "../models/linkModel.mjs";
 import TripStop from "../models/tripStopModel.mjs";
 import { InvalidError, NotFoundError } from "../utils/errors.mjs";
+import { sanitizeLimit } from "../utils/pagination.mjs";
 
 export const search = async (tripId, { cursor, limit = 10, search: searchText }) => {
     let query = { trip: tripId };
@@ -8,18 +9,9 @@ export const search = async (tripId, { cursor, limit = 10, search: searchText })
     if (cursor) {
         query._id = { $lt: cursor };
     }
-
-    if (searchText) {
-        query.$or = [
-            { title: { $regex: searchText, $options: "i" } },
-            { description: { $regex: searchText, $options: "i" } },
-            { url: { $regex: searchText, $options: "i" } }
-        ];
-    }
-
     const options = {
-        limit: parseInt(limit),
-        sort: { createdAt: -1 }
+        limit: sanitizeLimit(limit),
+        sort: { _id: -1 }
     };
 
     const links = await Link.find(query, null, options);
@@ -41,26 +33,28 @@ export const getLink = async (tripId, id) => {
 };
 
 
-export const createLink = async (trip, { url, title, icon,image, description }) => {
+export const createLink = async (trip, { url, title, icon,image, description, type }) => {
     const link = new Link({
         url,
         title,
         icon,
         image,
         description,
-        trip: trip._id
+        trip: trip._id,
+        type
     });
 
     return await link.save();
 };
 
 
-export const updateLink = async (link, { url, title, icon,image, description }) => {
+export const updateLink = async (link, { url, title, icon,image, description, type }) => {
     if (url !== undefined) link.url = url;
     if (title !== undefined) link.title = title;
     if (icon !== undefined) link.icon = icon;
     if (description !== undefined) link.description = description;
     if(image !== undefined) link.image = image;
+    if(type !== undefined) link.type = type;
 
     return await link.save();
 };

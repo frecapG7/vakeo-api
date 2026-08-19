@@ -10,16 +10,14 @@ app.get("/trips/:tripId/events", async (req, res) => {
 
     const tripId = req.params.tripId;
 
+    const {limit = 10} = req?.query;
     const events = await search(tripId, req?.query);
 
-    const totalResults = events?.length;
-    const prevCursor = totalResults > 0 ? buidCursor(events[0]) : null;
-    const nextCursor = totalResults > 0 ? buidCursor(events[events.length - 1]) : null;
+    const nextCursor = events?.length === limit ? buildCursor(events[events.length - 1]) : null;
 
     return res.status(200).json({
         nextCursor,
-        prevCursor,
-        totalResults,
+        totalResults : events?.length,
         events
     });
 });
@@ -72,7 +70,7 @@ app.delete("/trips/:tripId/events/:id", async (req, res) => {
  *                      PROTECTED METHODS
  * **************************************************************
  */
-const buidCursor = (event) => {
+const buildCursor = (event) => {
     if (event.startDate)
         return `${event._id}_${event.startDate}`;
     return event._id;

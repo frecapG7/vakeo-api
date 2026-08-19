@@ -13,18 +13,17 @@ const app = express();
  * @query {string} search - Filter by text in title, description, or url
  * @query {string} cursor - Pagination cursor (link _id)
  * @query {number} limit - Max results per page (default: 10)
- * @returns {object} - Paginated list of links with next/prev cursors
+ * @returns {object} - Paginated list of links with next cursor
  */
 app.get("/v2/trips/:tripId/links", async (req, res) => {
-    const { tripId } = req.params;
+    const { tripId } = req.params; 
+    const { limit = 10 } = req.query;
     const links = await search(tripId, req.query);
 
-    const prevCursor = links.length > 0 ? links[0]._id : null;
-    const nextCursor = links.length > 0 ? links[links.length - 1]._id : null;
+    const nextCursor = links.length === limit ? links[links.length - 1]?._id : null;
 
     return res.status(200).json({
         nextCursor,
-        prevCursor,
         totalResults: links.length,
         links
     });

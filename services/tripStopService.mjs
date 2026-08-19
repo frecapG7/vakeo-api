@@ -6,25 +6,17 @@ import { NotFoundError, InvalidError } from "../utils/errors.mjs";
 import { verifyUser } from "./validationService.mjs";
 
 
-const normalizeAccommodation = async (accommodation, tripId, session = null) => {
-  if (!accommodation || typeof accommodation === 'string') {
-    return accommodation;
-  }
+const normalizeAccommodation = async (accommodationId, tripId) => {
+  if (!accommodationId) return null;
 
-  if (accommodation && typeof accommodation === 'object') {
-    const link = await new Link({
-      url: accommodation.url,
-      title: accommodation.title || 'Accommodation',
-      icon: accommodation.icon,
-      image: accommodation.image,
-      description: accommodation.description,
-      trip: tripId,
-      type: 'accommodation'
-    }).save({ session });  // Pass session here
-    return link._id;
-  }
+  const link = await Link.findOne({
+    _id: accommodationId,
+    trip: tripId,
+    type: 'accommodation'
+  });
+  if (!link) throw new InvalidError("Accommodation link not found or invalid type");
 
-  return null;
+  return accommodationId;
 };
 
 // Get all stops for a trip
@@ -71,30 +63,18 @@ const createTripStop = async (tripId, stop, user) => {
 
   const { name, location, accommodation } = stop;
 
-  // Start transaction
-  const session = await TripStop.startSession();
-  session.startTransaction();
+  const accommodationId = await normalizeAccommodation(accommodation?._id, tripId);
 
-  try {
-    const accommodationId = await normalizeAccommodation(accommodation, tripId, session);
+  const newStop = await new TripStop({
+    name,
+    location,
+    accommodation: accommodationId,
+    trip: tripId,
+    createdBy: user._id,
+    modifiedBy: user._id
+  }).save();
 
-    const newStop = await new TripStop({
-      name,
-      location,
-      accommodation: accommodationId,
-      trip: tripId,
-      createdBy: user._id,
-      modifiedBy: user._id
-    }).save({ session });
-
-    await session.commitTransaction();
-    return newStop;
-  } catch (error) {
-    await session.abortTransaction();
-    throw error;
-  } finally {
-    session.endSession();
-  }
+  return newStop;
 };
 
 
@@ -112,14 +92,16 @@ const updateTripStop = async (tripId, stopId, stopData, user) => {
   const {
     name = stop.name,
     location = stop.location,
-    accommodation = stop.accommodation?._id
+    accommodation: newAccommodation
   } = stopData;
 
-
+  if (newAccommodation !== undefined) {
+    const idToValidate = newAccommodation?._id;
+    stop.accommodation = idToValidate ? await normalizeAccommodation(idToValidate, tripId) : null;
+  }
 
   stop.name = name;
   stop.location = location;
-  stop.accommodation = accommodation;
   stop.modifiedBy = user._id;
 
   await stop.save();

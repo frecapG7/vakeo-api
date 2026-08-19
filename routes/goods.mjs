@@ -16,18 +16,17 @@ const app = express();
  * @query {number} limit - Max results per page (default: 10)
  * @query {string} event - Filter by event ID
  * @query {boolean} unchecked - Filter by unchecked goods only
- * @returns {object} - Paginated list of goods with next/prev cursors
+ * @returns {object} - Paginated list of goods with next cursors
  */
 app.get("/trips/:tripId/goods", async (req, res) => {
     const { tripId } = req.params;
+    const {limit } = req?.query;
     const goods = await search(tripId, req.query);
 
-    const prevCursor = goods.length > 0 ? buidCursor(goods[0]) : null;
-    const nextCursor = goods.length > 0 ? buidCursor(goods[goods.length - 1]) : null;
+    const nextCursor = goods.length  === limit ? buidCursor(goods[goods.length - 1]) : null;
 
     return res.status(200).json({
         nextCursor,
-        prevCursor,
         totalResults: goods.length,
         goods
     });
