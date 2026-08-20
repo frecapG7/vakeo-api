@@ -1,10 +1,10 @@
 
 import express from "express";
 import { getTrip } from "../services/tripService.mjs";
-import { checkGood, checkMultipleGoods, createGood, getCount, getGood, getNames, getSummary, search, updateGood } from "../services/goodsService.mjs";
+import { checkGood, checkMultipleGoods, createGood, getGood, search, updateGood } from "../services/goodsService.mjs";
 import { verifyUser } from "../services/validationService.mjs";
 import passport from "passport";
-import { sanitizeLimit } from "../utils/pagination.mjs";
+import { sanitizeLimit, buildCursor, readCursor } from "../utils/pagination.mjs";
 
 const app = express();
 
@@ -21,14 +21,18 @@ const app = express();
  */
 app.get("/trips/:tripId/goods", async (req, res) => {
     const { tripId } = req.params;
-    const {limit } = req?.query;
+    const { limit } = req?.query;
     const sanitizedLimit = sanitizeLimit(limit);
     const goods = await search(tripId, {
         ...req?.query,
         limit: sanitizedLimit
     });
 
-    const nextCursor = goods.length === sanitizedLimit ? buidCursor(goods[goods.length - 1]) : null;
+    const nextCursor = goods.length === sanitizedLimit ? buildCursor({
+        _id: goods[goods.length - 1]?._id.toString(),
+        checked: goods[goods.length - 1]?.checked,
+        name: goods[goods.length - 1]?.name
+    }) : null;
 
     return res.status(200).json({
         nextCursor,
@@ -118,7 +122,7 @@ app.put("/v2/trips/:tripId/goods/checked", passport.authenticate('user-header', 
     const trip = await getTrip(tripId);
     verifyUser(trip, req.user);
 
-    const { event, createdBy} = req.query;
+    const { event, createdBy } = req.query;
     const result = await checkMultipleGoods(tripId, { event, createdBy });
     return res.status(200).json(result);
 });
@@ -183,8 +187,5 @@ app.put("/v2/trips/:tripId/goods/:goodId", passport.authenticate('user-header', 
  *                      PROTECTED METHODS
  * **************************************************************
  */
-const buidCursor = (good) => {
-    return `${good.checked}_${good.name}_${good._id}`;
-}
 
 export default app;

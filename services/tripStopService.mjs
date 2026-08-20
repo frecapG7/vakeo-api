@@ -63,7 +63,7 @@ const createTripStop = async (tripId, stop, user) => {
 
   const { name, location, accommodation } = stop;
 
-  const accommodationId = await normalizeAccommodation(accommodation?._id, tripId);
+  const accommodationId = await normalizeAccommodation(accommodation?._id ?? accommodation, tripId);
 
   const newStop = await new TripStop({
     name,
@@ -96,7 +96,7 @@ const updateTripStop = async (tripId, stopId, stopData, user) => {
   } = stopData;
 
   if (newAccommodation !== undefined) {
-    const idToValidate = newAccommodation?._id;
+    const idToValidate = newAccommodation?._id ?? newAccommodation;
     stop.accommodation = idToValidate ? await normalizeAccommodation(idToValidate, tripId) : null;
   }
 

@@ -18,3 +18,18 @@ export const sanitizeSearchText = (text, maxLength = 100) => {
     }
     return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 };
+
+export const buildCursor = (cursorData) => {
+    
+    return Buffer.from(JSON.stringify(cursorData)).toString('base64');
+};
+
+export const readCursor = (cursor) => {
+    if (!cursor) return null;
+    try {
+        const decoded = Buffer.from(cursor, 'base64').toString('utf-8');
+        return JSON.parse(decoded);
+    } catch (err) {
+        return null;
+    }
+};

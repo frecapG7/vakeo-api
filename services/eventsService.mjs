@@ -1,6 +1,6 @@
 import Event from "../models/eventModel.mjs";
 import { NotFoundError } from "../utils/errors.mjs";
-import { sanitizeSearchText } from "../utils/pagination.mjs";
+import { readCursor, sanitizeSearchText } from "../utils/pagination.mjs";
 import { verifyDates, verifyUser } from "./validationService.mjs";
 
 export const search = async (tripId, { cursor, limit = 10, type, startDate, endDate, attendee, owner, search }) => {
@@ -12,9 +12,15 @@ export const search = async (tripId, { cursor, limit = 10, type, startDate, endD
     let lastStartDate;
     let lastId;
     if (cursor) {
-        const [cursorId, cursorStartDate] = cursor.split("_");
-        lastId = cursorId;
-        lastStartDate = cursorStartDate;
+        try {
+            const cursorData = readCursor(cursor);
+            lastId = cursorData?._id;
+            lastStartDate = cursorData?.startDate;
+        } catch (e) {
+            const [startDate, _id] = cursor;
+            lastId = _id;
+            lastStartDate = startDate;
+        }
     }
     if (type)
         query.type = type;
@@ -39,7 +45,7 @@ export const search = async (tripId, { cursor, limit = 10, type, startDate, endD
                     $or:
                         [
                             { startDate: { $gt: lastStartDate } },
-                            { startDate: { $eq: startDate }, _id: { $gt: lastId } }
+                            { startDate: { $eq: lastStartDate }, _id: { $gt: lastId } }
                         ]
                 }
             ]
