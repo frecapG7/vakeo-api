@@ -1,7 +1,7 @@
 import express from "express";
 import { getTrip } from "../services/tripService.mjs";
 import { createEvent, getEvent, search, updateEvent } from "../services/eventsService.mjs";
-import { sanitizeLimit } from "../utils/pagination.mjs";
+import { buildCursor, sanitizeLimit } from "../utils/pagination.mjs";
 
 
 
@@ -73,15 +73,4 @@ app.delete("/trips/:tripId/events/:id", async (req, res) => {
     return res.status(204).json({});
 });
 
-
-/****************************************************************
- *                      PROTECTED METHODS
- * **************************************************************
- */
-// const buildCursor = (event) => {
-//     if (event.startDate)
-//         return `${event._id}_${event.startDate}`;
-//     return event._id;
-// }
-
-// export default app;
+export default app;

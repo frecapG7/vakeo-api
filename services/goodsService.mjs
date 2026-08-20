@@ -31,7 +31,6 @@ export const search = async (tripId, { search = "", cursor, limit = 10, event, u
 
     if (cursor) {
         try {
-            // const cursorData = JSON.parse(Buffer.from(cursor, 'base64').toString('utf8'));
             const cursorData = readCursor(cursor);
             lastName = cursorData.name;
             lastChecked = cursorData.checked;
@@ -62,7 +61,8 @@ export const search = async (tripId, { search = "", cursor, limit = 10, event, u
         limit,
         sort: {
             checked: 1,
-            name: 1
+            name: 1,
+            _id: 1
         }
     };
 

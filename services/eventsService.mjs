@@ -12,11 +12,11 @@ export const search = async (tripId, { cursor, limit = 10, type, startDate, endD
     let lastStartDate;
     let lastId;
     if (cursor) {
-        try {
-            const cursorData = readCursor(cursor);
+        const cursorData = readCursor(cursor);
+        if (cursorData) {
             lastId = cursorData?._id;
             lastStartDate = cursorData?.startDate;
-        } catch (e) {
+        } else {
             const [startDate, _id] = cursor;
             lastId = _id;
             lastStartDate = startDate;
@@ -59,7 +59,8 @@ export const search = async (tripId, { cursor, limit = 10, type, startDate, endD
     const options = {
         limit,
         sort: {
-            startDate: 1
+            startDate: 1,
+            _id: 1
         }
     };
 
