@@ -13,8 +13,9 @@ const tripStopSchema = new mongoose.Schema({
         required: false,
     },
     accommodation: {
-        type: linkSchema,
-        required: false,
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Link",
+        required: false
     },
     polls: {
         type: [{
@@ -22,7 +23,7 @@ const tripStopSchema = new mongoose.Schema({
             ref: "Poll"
         }],
         validate: {
-            validator: function(arr) { return arr.length <= 10; },
+            validator: function (arr) { return arr.length <= 10; },
             message: "A stop cannot have more than 10 polls"
         }
     },

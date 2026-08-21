@@ -1,5 +1,6 @@
 import Event from "../models/eventModel.mjs";
 import { NotFoundError } from "../utils/errors.mjs";
+import { readCursor, sanitizeSearchText } from "../utils/pagination.mjs";
 import { verifyDates, verifyUser } from "./validationService.mjs";
 
 export const search = async (tripId, { cursor, limit = 10, type, startDate, endDate, attendee, owner, search }) => {
@@ -11,9 +12,15 @@ export const search = async (tripId, { cursor, limit = 10, type, startDate, endD
     let lastStartDate;
     let lastId;
     if (cursor) {
-        const [cursorId, cursorStartDate] = cursor.split("_");
-        lastId = cursorId;
-        lastStartDate = cursorStartDate;
+        const cursorData = readCursor(cursor);
+        if (cursorData) {
+            lastId = cursorData?._id;
+            lastStartDate = cursorData?.startDate;
+        } else {
+            const [startDate, _id] = cursor;
+            lastId = _id;
+            lastStartDate = startDate;
+        }
     }
     if (type)
         query.type = type;
@@ -26,8 +33,9 @@ export const search = async (tripId, { cursor, limit = 10, type, startDate, endD
         query.attendees = attendee
     if (owner)
         query.owners = owner;
-    if (search)
-        query.name = { $regex: search, $options: "i" };
+    const escapedSearch = sanitizeSearchText(search);
+    if (escapedSearch)
+        query.name = { $regex: escapedSearch, $options: "i" };
 
     if (lastId) {
         if (lastStartDate)
@@ -37,7 +45,7 @@ export const search = async (tripId, { cursor, limit = 10, type, startDate, endD
                     $or:
                         [
                             { startDate: { $gt: lastStartDate } },
-                            { startDate: { $eq: startDate }, _id: { $gt: lastId } }
+                            { startDate: { $eq: lastStartDate }, _id: { $gt: lastId } }
                         ]
                 }
             ]
@@ -51,7 +59,8 @@ export const search = async (tripId, { cursor, limit = 10, type, startDate, endD
     const options = {
         limit,
         sort: {
-            startDate: 1
+            startDate: 1,
+            _id: 1
         }
     };
 

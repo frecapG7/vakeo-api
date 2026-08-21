@@ -1,5 +1,6 @@
 import Good from "../models/goodModel.mjs";
 import { InvalidError, NotFoundError } from "../utils/errors.mjs";
+import { readCursor, sanitizeSearchText } from "../utils/pagination.mjs";
 import { verifyUser } from "./validationService.mjs";
 
 export const getGood = async (tripId, goodId) => {
@@ -26,14 +27,21 @@ export const search = async (tripId, { search = "", cursor, limit = 10, event, u
     let lastId;
 
     if (search)
-        query.name = { $regex: search, $options: "i" };
+        query.name = { $regex: sanitizeSearchText(search), $options: "i" };
 
     if (cursor) {
-        const [cursorChecked, cursorName, cursorId] = cursor.split("_");
-
-        lastName = cursorName;
-        lastChecked = cursorChecked === "true";
-        lastId = cursorId;
+        try {
+            const cursorData = readCursor(cursor);
+            lastName = cursorData.name;
+            lastChecked = cursorData.checked;
+            lastId = cursorData._id;
+        } catch (e) {
+            // Fallback for legacy underscore-delimited cursors
+            const [cursorChecked, cursorName, cursorId] = cursor.split("_");
+            lastName = cursorName;
+            lastChecked = cursorChecked === "true";
+            lastId = cursorId;
+        }
     }
 
     if (lastName && lastId)
@@ -53,7 +61,8 @@ export const search = async (tripId, { search = "", cursor, limit = 10, event, u
         limit,
         sort: {
             checked: 1,
-            name: 1
+            name: 1,
+            _id: 1
         }
     };
 
@@ -107,67 +116,4 @@ export const checkMultipleGoods = async (tripId, { event, createdBy }) => {
     if (event) query.event = event;
     if (createdBy) query.createdBy = createdBy;
     return Good.updateMany(query, { checked: true });
-}
-
-
-// ***************** DEPRECATED *****************
-
-export const getSummary = async ({ params: { tripId }, query: { event }, }) => {
-    const baseQuery = {
-        trip: tripId,
-        event,
-    }
-
-    const totalCount = await Good.countDocuments(baseQuery);
-    const checkedCount = await Good.countDocuments({
-        ...baseQuery,
-        checked: true
-    });
-    const goods = await Good.find(baseQuery, null, {
-        limit: 4,
-    });
-    return {
-        totalCount,
-        checkedCount,
-        goods
-    }
-
-
-}
-
-export const getNames = async (tripId, search = "") => {
-    const query = {
-        trip: tripId,
-        name: { $regex: search, $options: "i" }
-    };
-
-    const options = {
-        limit: 5,
-        sort: {
-            name: 1
-        }
-    };
-
-    const goods = await Good.find(query, null, options).distinct("name");
-    return goods;
-}
-
-export const getCount = async (tripId, event) => {
-    const query = {
-        trip: tripId,
-        ...(event && { event })
-    };
-
-    const checkedCount = await Good.countDocuments({
-        ...query,
-        checked: true
-    });
-
-    const totalCount = await Good.countDocuments(query);
-
-    return {
-        checkedCount,
-        totalCount
-    };
-
 }

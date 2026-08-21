@@ -1,6 +1,7 @@
 import express from "express";
 import { getTrip } from "../services/tripService.mjs";
 import { createEvent, getEvent, search, updateEvent } from "../services/eventsService.mjs";
+import { buildCursor, sanitizeLimit } from "../utils/pagination.mjs";
 
 
 
@@ -10,16 +11,21 @@ app.get("/trips/:tripId/events", async (req, res) => {
 
     const tripId = req.params.tripId;
 
-    const events = await search(tripId, req?.query);
+    const { limit = 10 } = req?.query;
+    const sanitizedLimit = sanitizeLimit(limit);
+    const events = await search(tripId, {
+        ...req?.query,
+        limit: sanitizedLimit
+    });
 
-    const totalResults = events?.length;
-    const prevCursor = totalResults > 0 ? buidCursor(events[0]) : null;
-    const nextCursor = totalResults > 0 ? buidCursor(events[events.length - 1]) : null;
+    const nextCursor = events?.length === sanitizedLimit ? buildCursor({
+        _id: events[events.length - 1]?._id,
+        startDate: events[events.length - 1]?.startDate
+    }) : null;
 
     return res.status(200).json({
         nextCursor,
-        prevCursor,
-        totalResults,
+        totalResults: events?.length,
         events
     });
 });
@@ -66,16 +72,5 @@ app.delete("/trips/:tripId/events/:id", async (req, res) => {
     await event.deleteOne();
     return res.status(204).json({});
 });
-
-
-/****************************************************************
- *                      PROTECTED METHODS
- * **************************************************************
- */
-const buidCursor = (event) => {
-    if (event.startDate)
-        return `${event._id}_${event.startDate}`;
-    return event._id;
-}
 
 export default app;

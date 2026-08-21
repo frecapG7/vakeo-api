@@ -1,8 +1,23 @@
 import Trip from "../models/tripModel.mjs";
 import TripStop from "../models/tripStopModel.mjs";
+import Link from "../models/linkModel.mjs";
 import { Poll } from "../models/pollModel.mjs";
 import { NotFoundError, InvalidError } from "../utils/errors.mjs";
 import { verifyUser } from "./validationService.mjs";
+
+
+const normalizeAccommodation = async (accommodationId, tripId) => {
+  if (!accommodationId) return null;
+
+  const link = await Link.findOne({
+    _id: accommodationId,
+    trip: tripId,
+    type: 'accommodation'
+  });
+  if (!link) throw new InvalidError("Accommodation link not found or invalid type");
+
+  return accommodationId;
+};
 
 // Get all stops for a trip
 const getTripStops = async (tripId) => {
@@ -11,7 +26,8 @@ const getTripStops = async (tripId) => {
       path: "polls",
       select: "_id type question hasSelected",
       populate: { path: "hasSelected", select: "_id name avatar" }
-    });
+    })
+    .populate("accommodation")
   return stops || [];
 };
 
@@ -27,36 +43,40 @@ const getTripStop = async (tripId, stopId) => {
       populate: { path: "hasSelected", select: "_id name avatar" }
     },
     { path: "createdBy", select: "_id name avatar" },
-    { path: "modifiedBy", select: "_id name avatar" }
+    { path: "modifiedBy", select: "_id name avatar" },
+    { path: "accommodation" }
   ]);
 
   if (!stop) throw new NotFoundError(`Stop ${stopId} not found in trip ${tripId}`);
   return stop;
 };
 
-// Create a new stop
 const createTripStop = async (tripId, stop, user) => {
   const trip = await Trip.findById(tripId);
   if (!trip) throw new NotFoundError(`Trip ${tripId} not found`);
+  verifyUser(trip, user);
 
-  verifyUser(trip, user)
-
-  // Validate stops limit (50)
   const stopCount = await TripStop.countDocuments({ trip: tripId });
   if (stopCount >= 50) {
     throw new InvalidError("Cannot add more than 50 stops to a trip");
   }
+
   const { name, location, accommodation } = stop;
 
-  return await TripStop.create({
+  const accommodationId = await normalizeAccommodation(accommodation?._id ?? accommodation, tripId);
+
+  const newStop = await new TripStop({
     name,
     location,
-    accommodation,
+    accommodation: accommodationId,
     trip: tripId,
     createdBy: user._id,
     modifiedBy: user._id
-  });
+  }).save();
+
+  return newStop;
 };
+
 
 // Update a stop
 const updateTripStop = async (tripId, stopId, stopData, user) => {
@@ -72,20 +92,27 @@ const updateTripStop = async (tripId, stopId, stopData, user) => {
   const {
     name = stop.name,
     location = stop.location,
-    accommodation = stop.accommodation
+    accommodation: newAccommodation
   } = stopData;
+
+  if (newAccommodation !== undefined) {
+    const idToValidate = newAccommodation?._id ?? newAccommodation;
+    stop.accommodation = idToValidate ? await normalizeAccommodation(idToValidate, tripId) : null;
+  }
 
   stop.name = name;
   stop.location = location;
-  stop.accommodation = accommodation;
   stop.modifiedBy = user._id;
 
   await stop.save();
-  await stop.populate({
+  await stop.populate([{
     path: "polls",
     select: "_id type question hasSelected",
     populate: { path: "hasSelected", select: "_id name avatar" }
-  });
+  },
+  {
+    path: "accommodation"
+  }]);
   return stop;
 };
 
@@ -114,3 +141,5 @@ export {
   updateTripStop,
   deleteTripStop,
 };
+
+
