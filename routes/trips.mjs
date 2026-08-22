@@ -69,11 +69,8 @@ app.get("/:id/dashboard",
   async (req, res) => {
     const trip = await getTrip(req.params.id);
     const userId = req.user?._id;
-
-    if (trip.isPrivate) {
-      if (!userId) throw new ForbiddenError("Private trip requires authenticated user");
+    if (userId)
       verifyUser(trip, { _id: userId });
-    }
 
     const result = await dashboard(trip, userId);
     return res.status(200).json(result);
