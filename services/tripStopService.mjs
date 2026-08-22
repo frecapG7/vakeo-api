@@ -1,23 +1,50 @@
 import Trip from "../models/tripModel.mjs";
 import TripStop from "../models/tripStopModel.mjs";
 import Link from "../models/linkModel.mjs";
-import { Poll } from "../models/pollModel.mjs";
 import { NotFoundError, InvalidError } from "../utils/errors.mjs";
 import { verifyUser } from "./validationService.mjs";
+import mongoose from "mongoose";
 
-
-const normalizeAccommodation = async (accommodationId, tripId) => {
-  if (!accommodationId) return null;
-
-  const link = await Link.findOne({
-    _id: accommodationId,
-    trip: tripId,
-    type: 'accommodation'
-  });
-  if (!link) throw new InvalidError("Accommodation link not found or invalid type");
-
-  return accommodationId;
-};
+const syncAccommodation = async (tripId, previousAccommodation, nextAccommodation, session) => {
+  // 1 - If accommodation was removed
+  if (nextAccommodation === null) {
+    if (previousAccommodation?._id)
+      await Link.deleteOne({
+        _id: previousAccommodation._id,
+        trip: tripId,
+        type: 'accommodation'
+      }, { session });
+    return null;
+  }
+  // 2 - accommodation was added
+  else if (previousAccommodation === null) {
+    const newLink = await new Link({
+      url: nextAccommodation?.url,
+      title: nextAccommodation?.title,
+      icon: nextAccommodation?.icon,
+      image: nextAccommodation?.image,
+      description: nextAccommodation?.description,
+      type: "accommodation",
+      trip: tripId
+    }).save({ session });
+    return newLink._id;
+  }
+  // 3 - accommodation was updated
+  else {
+    const link = await Link.findOneAndUpdate({
+      _id: previousAccommodation._id,
+      trip: tripId,
+      type: "accommodation"
+    }, {
+      url: nextAccommodation?.url,
+      title: nextAccommodation?.title,
+      icon: nextAccommodation?.icon,
+      image: nextAccommodation?.image,
+      description: nextAccommodation?.description,
+    }, { session, new: true });
+    return link._id;
+  }
+}
 
 // Get all stops for a trip
 const getTripStops = async (tripId) => {
@@ -63,18 +90,27 @@ const createTripStop = async (tripId, stop, user) => {
 
   const { name, location, accommodation } = stop;
 
-  const accommodationId = await normalizeAccommodation(accommodation?._id ?? accommodation, tripId);
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
 
-  const newStop = await new TripStop({
-    name,
-    location,
-    accommodation: accommodationId,
-    trip: tripId,
-    createdBy: user._id,
-    modifiedBy: user._id
-  }).save();
-
-  return newStop;
+    const accommodationId = await syncAccommodation(tripId, null, accommodation, session);
+    const newStop = await new TripStop({
+      name,
+      location,
+      accommodation: accommodationId,
+      trip: tripId,
+      createdBy: user._id,
+      modifiedBy: user._id
+    }).save({ session });
+    await session.commitTransaction();
+    return newStop;
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
 };
 
 
@@ -85,7 +121,7 @@ const updateTripStop = async (tripId, stopId, stopData, user) => {
 
   verifyUser(trip, user);
 
-  const stop = await TripStop.findOne({ _id: stopId, trip: tripId });
+  const stop = await TripStop.findOne({ _id: stopId, trip: tripId }).populate("accommodation");
   if (!stop) throw new NotFoundError(`Stop ${stopId} not found in trip ${tripId}`);
 
   // Explicit assignment of allowed fields only
@@ -95,25 +131,35 @@ const updateTripStop = async (tripId, stopId, stopData, user) => {
     accommodation: newAccommodation
   } = stopData;
 
-  if (newAccommodation !== undefined) {
-    const idToValidate = newAccommodation?._id ?? newAccommodation;
-    stop.accommodation = idToValidate ? await normalizeAccommodation(idToValidate, tripId) : null;
+
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+
+    if (newAccommodation !== undefined)
+      stop.accommodation = await syncAccommodation(tripId, stop?.accommodation, newAccommodation, session);
+    stop.name = name;
+    stop.location = location;
+    stop.modifiedBy = user._id;
+
+    const newStop = await stop.save({ session });
+    await session.commitTransaction();
+
+    await newStop.populate([{
+      path: "polls",
+      select: "_id type question hasSelected",
+      populate: { path: "hasSelected", select: "_id name avatar" }
+    },
+    {
+      path: "accommodation"
+    }]);
+    return newStop;
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
   }
-
-  stop.name = name;
-  stop.location = location;
-  stop.modifiedBy = user._id;
-
-  await stop.save();
-  await stop.populate([{
-    path: "polls",
-    select: "_id type question hasSelected",
-    populate: { path: "hasSelected", select: "_id name avatar" }
-  },
-  {
-    path: "accommodation"
-  }]);
-  return stop;
 };
 
 // Delete a stop
@@ -129,9 +175,29 @@ const deleteTripStop = async (tripId, stopId, user) => {
   if (stop.polls.filter(p => !p.isClosed).length > 0)
     throw new InvalidError("Cannot delete a stop with existing polls");
 
-  const result = await TripStop.deleteOne({ _id: stopId, trip: tripId });
-  if (result.deletedCount === 0)
-    throw new NotFoundError(`Stop ${stopId} not found in trip ${tripId}`);
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+    const accommodationId = stop.accommodation?._id ?? stop.accommodation; // Work if field is populated or not 
+    if (accommodationId)
+      await Link.deleteOne({
+        _id: accommodationId,
+        trip: tripId,
+        type: "accommodation"
+      }, { session });
+    const result = await TripStop.deleteOne({ _id: stopId, trip: tripId }, { session });
+    if (result.deletedCount === 0)
+      throw new NotFoundError(`Stop ${stopId} not found in trip ${tripId}`);
+
+    await session.commitTransaction();
+
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    await session.endSession();
+  }
+
 };
 
 export {
