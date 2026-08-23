@@ -65,10 +65,11 @@ app.get("/:id/share", async (req, res) => {
 
 
 app.get("/:id/dashboard",
-  passport.authenticate('user-header', { session: false, failWithError: false }),
+  passport.authenticate(['user-header', 'anonymous'], { session: false, failWithError: false }),
   async (req, res) => {
     const trip = await getTrip(req.params.id);
     const userId = req.user?._id;
+    console.log("toto")
     if (userId)
       verifyUser(trip, { _id: userId });
 
