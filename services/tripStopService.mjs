@@ -17,7 +17,7 @@ const syncAccommodation = async (tripId, previousAccommodation, nextAccommodatio
     return null;
   }
   // 2 - accommodation was added
-  else if (previousAccommodation === null) {
+  else if (!previousAccommodation?._id) {
     const newLink = await new Link({
       url: nextAccommodation?.url,
       title: nextAccommodation?.title,
