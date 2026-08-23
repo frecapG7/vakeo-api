@@ -2,6 +2,7 @@ import Trip from "../models/tripModel.mjs";
 import TripStop from "../models/tripStopModel.mjs";
 import Good from "../models/goodModel.mjs";
 import Event from "../models/eventModel.mjs";
+import Link from "../models/linkModel.mjs";
 import {Poll} from "../models/pollModel.mjs";
 import { NotFoundError } from "../utils/errors.mjs";
 import { sanitizeSearchText } from "../utils/pagination.mjs";
@@ -93,12 +94,13 @@ export const deleteTrip = async (id) => {
 
 
 export const dashboard = async (trip, userId) => {
-  const [stopsData, goodsData, eventsData, pollsData, usersData] = await Promise.all([
+  const [stopsData, goodsData, eventsData, pollsData, usersData, linksData] = await Promise.all([
     stops(trip),
     goods(trip),
     events(trip, userId),
     polls(trip, userId),
     users(trip),
+    links(trip)
   ]);
 
   return {
@@ -107,6 +109,7 @@ export const dashboard = async (trip, userId) => {
     events: eventsData,
     polls: pollsData,
     users: usersData,
+    links: linksData
   };
 }
 
@@ -207,3 +210,13 @@ const polls = async (trip, userId) => {
     hasPendingDatePoll
   };
 };
+
+
+const links = async (tripId) => {
+  const linksCount =  await Link.countDocuments({
+    trip: tripId
+  });
+  return {
+    linksCount
+  }
+}
