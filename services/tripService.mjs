@@ -3,7 +3,7 @@ import TripStop from "../models/tripStopModel.mjs";
 import Good from "../models/goodModel.mjs";
 import Event from "../models/eventModel.mjs";
 import Link from "../models/linkModel.mjs";
-import {Poll} from "../models/pollModel.mjs";
+import { Poll } from "../models/pollModel.mjs";
 import { NotFoundError } from "../utils/errors.mjs";
 import { sanitizeSearchText } from "../utils/pagination.mjs";
 import { verifyDates } from "./validationService.mjs";
@@ -12,84 +12,83 @@ import { createTripUser } from "./tripUserService.mjs";
 
 export const search = async ({ ids, search }) => {
 
-    if (!ids)
-        return [];
+  if (!ids)
+    return [];
 
-    const searchIds = ids.split(",");
+  const searchIds = ids.split(",");
 
+  let query = {
+    _id: { $in: searchIds },
+  }
+  const escapedSearch = sanitizeSearchText(search);
+  if (escapedSearch)
+    query.name = { $regex: escapedSearch, $options: "i" }
 
-    let query = {
-        _id: { $in: searchIds },
+  const trips = await Trip.find(
+    query,
+    "users name image startDate endDate createdAt", {
+    limit: 20,
+    sort: {
+      createdAt: -1
     }
-    const escapedSearch = sanitizeSearchText(search);
-    if (escapedSearch)
-        query.name = { $regex: escapedSearch, $options: "i" }
+  })
+    .populate("users", "avatar name");
 
-    const trips = await Trip.find(
-        query,
-        "users name image startDate endDate createdAt", {
-        limit: 20,
-        sort: {
-            createdAt: -1
-        }
-    })
-        .populate("users", "avatar name");
-
-    return trips;
+  return trips;
 
 }
 
 export const getTrip = async (id, includeStops = false) => {
-    const trip = await Trip.findById(id);
-    if (!trip)
-        throw new NotFoundError(`Cannot find trip with id ${id}`);
-    if (includeStops) {
-        trip.stops = await TripStop.find({ trip: id })
-            .populate("polls", "_id type question");
-    }
+  const trip = await Trip.findById(id);
+  if (!trip)
+    throw new NotFoundError(`Cannot find trip with id ${id}`);
+  if (includeStops) {
+    trip.stops = await TripStop.find({ trip: id })
+      .populate("polls", "_id type question");
+  }
 
-    return trip;
+  return trip;
 }
 
 
 export const createTrip = async ({ name, description, users, image, isPrivate }) => {
-    const trip = new Trip({
-        name,
-        description,
-        users,
-        image,
-        isPrivate
-    });
-    const savedTrip = await trip.save();
+  const trip = new Trip({
+    name,
+    description,
+    users,
+    image,
+    isPrivate
+  });
+  const savedTrip = await trip.save();
 
-    return savedTrip;
+  return savedTrip;
 }
 
 export const updateTrip = async (trip, { name, description, users, image, startDate, endDate, location, isPrivate }) => {
 
-    verifyDates(startDate, endDate);
+  verifyDates(startDate, endDate);
 
-    trip.name = name;
-    trip.description = description;
-    trip.image = image;
-    trip.startDate = startDate;
-    trip.endDate = endDate;
-    trip.location = location;
-    trip.isPrivate = isPrivate;
+  trip.name = name;
+  trip.description = description;
+  trip.image = image;
+  trip.startDate = startDate;
+  trip.endDate = endDate;
+  trip.location = location;
+  trip.isPrivate = isPrivate;
 
-    const savedUsers = await Promise.all(users?.filter?.(user => !user._id)
-        .map(user => createTripUser(user)));
-    trip.users.push(...savedUsers.map(u => u._id));
+  const savedUsers = await Promise.all(users?.filter?.(user => !user._id)
+    .map(user => createTripUser(user)));
+  trip.users.push(...savedUsers.map(u => u._id));
 
-    return await trip.save();
+  return await trip.save();
 }
 
 
 export const deleteTrip = async (id) => {
 
-    const trip = await Trip.findByIdAndDelete(id);
-    if (!trip)
-        throw new NotFoundError(`Cannot find trip to delete with id ${id}`);
+  const trip = await Trip.findByIdAndDelete(id);
+  if (!trip)
+    throw new NotFoundError(`Cannot find trip to delete with id ${id}`);
 }
 
 
@@ -166,54 +165,27 @@ const users = async (trip) => {
 
 const polls = async (trip, userId) => {
   const tripId = trip._id;
-
-  const [stopPollExists, datePollExists] = await Promise.all([
-    Poll.exists({
+  const [openPollsCount, pendingPollsCount] = await Promise.all([
+    Poll.countDocuments({
       trip: tripId,
       isClosed: false,
-      type: { $in: ['HousingPoll', 'OtherPoll'] }
     }),
-    Poll.exists({
+    userId ? Poll.countDocuments({
       trip: tripId,
       isClosed: false,
-      type: 'DatesPoll'
-    })
+      hasSelected: { $nin: [userId] }
+    }) : 0
   ]);
 
-  let hasPendingStopPoll = false;
-  let hasPendingDatePoll = false;
-
-  if (userId) {
-    const [pendingStopPollExists, pendingDatePollExists] = await Promise.all([
-      Poll.exists({
-        trip: tripId,
-        isClosed: false,
-        type: { $in: ['HousingPoll', 'OtherPoll'] },
-        hasSelected: { $nin: [userId] }
-      }),
-      Poll.exists({
-        trip: tripId,
-        isClosed: false,
-        type: 'DatesPoll',
-        hasSelected: { $nin: [userId] }
-      })
-    ]);
-
-    hasPendingStopPoll = pendingStopPollExists !== null;
-    hasPendingDatePoll = pendingDatePollExists !== null;
-  }
-
   return {
-    hasStopPoll: stopPollExists !== null,
-    hasPendingStopPoll,
-    hasDatePoll: datePollExists !== null,
-    hasPendingDatePoll
+    openPollsCount,
+    pendingPollsCount
   };
 };
 
 
 const links = async (tripId) => {
-  const linksCount =  await Link.countDocuments({
+  const linksCount = await Link.countDocuments({
     trip: tripId
   });
   return {
