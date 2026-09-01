@@ -6,8 +6,8 @@ import { verifyUser } from "./validationService.mjs";
 import mongoose from "mongoose";
 
 const syncAccommodation = async (tripId, previousAccommodation, nextAccommodation, session) => {
-  // 1 - If accommodation was removed
-  if (nextAccommodation === null) {
+  // 1 - If accommodation was removed (null or undefined)
+  if (nextAccommodation == null) {
     if (previousAccommodation?._id)
       await Link.deleteOne({
         _id: previousAccommodation._id,
@@ -42,6 +42,8 @@ const syncAccommodation = async (tripId, previousAccommodation, nextAccommodatio
       image: nextAccommodation?.image,
       description: nextAccommodation?.description,
     }, { session, new: true });
+    if (!link)
+      throw new NotFoundError(`Accommodation link for trip ${tripId} not found`);
     return link._id;
   }
 }
