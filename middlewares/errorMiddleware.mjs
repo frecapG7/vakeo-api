@@ -1,12 +1,21 @@
 
 
 export const handleError = (err, req, res, next) => {
-    console.error("Toto: ", err);
-    if (err.statusCode) {
-        res.status(err.statusCode).send({ message: err.message });
-    } else {
-        res.status(500).json({ message: "Internal server error" });
+    const status = err.statusCode || 500;
+    const isOperational = Boolean(err.statusCode);
+
+    if (!isOperational) {
+        console.error("[unhandled]", {
+            method: req.method,
+            url: req.originalUrl,
+            message: err.message,
+            stack: err.stack,
+        });
     }
+
+    res.status(status).json({
+        message: isOperational ? err.message : "Internal server error",
+    });
 }
 
 
