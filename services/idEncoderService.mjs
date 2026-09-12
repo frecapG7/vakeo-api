@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import config from '../config.mjs';
+import { InvalidError } from '../utils/errors.mjs';
 
 const SECRET = config.obfuscation_key || config.token_secret;
 if(!SECRET)
@@ -42,4 +43,19 @@ export const decodeId = (encoded) => {
   decipher.setAuthTag(authTag);
   let decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
   return decrypted.toString('utf8');
+};
+
+/**
+ * Resolve an encoded trip identifier (from a v3 URL) to the raw trip id.
+ * Decodes via decodeId; on any failure (tampered, truncated, wrong key)
+ * throws a clean InvalidError so the error middleware returns 422, not 500.
+ * @param {string} encoded - base64url-encoded trip id from the URL
+ * @returns {string} raw trip id (ObjectId string)
+ */
+export const resolveEncodedTripId = (encoded) => {
+  try {
+    return decodeId(encoded);
+  } catch (err) {
+    throw new InvalidError("Invalid or tampered trip identifier");
+  }
 };

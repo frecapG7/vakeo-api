@@ -1,10 +1,13 @@
 import mongoose from "mongoose";
 
-
-
 /**
  * TripUser schema
  * User naming must stay reserved for UserAccount one day
+ *
+ * The `token` field is the seat-claim marker:
+ * - null  = seat is free (no one has claimed it)
+ * - value = seat is claimed (the value is the identity secret for v3 auth)
+ * Tokens are minted by `claimSeat`, not at creation.
  */
 const tripUserSchema = new mongoose.Schema({
     name: {
@@ -18,6 +21,12 @@ const tripUserSchema = new mongoose.Schema({
     restrictions: {
         type: [String],
         required: false
+    },
+    token: {
+        type: String,
+        index: true,
+        unique: true,
+        select: false,
     }
 });
 
