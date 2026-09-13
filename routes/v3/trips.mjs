@@ -136,24 +136,17 @@ app.get("/:tripId/dashboard", optionalAuth, async (req, res) => {
 
 
 /**
- * POST /:tripId/share — generate a share link (member only).
- * Private trip → returns a time-bounded join token.
- * Public trip → returns the encoded trip id (read capability).
+ * POST /:tripId/share — generate a universal share token (member only).
+ * Always returns a join token (JWT) containing the tripId.
+ * The /token/:value endpoint resolves it to trip info + available seats.
  */
 app.post("/:tripId/share", auth, async (req, res) => {
     const rawId = resolveEncodedTripId(req.params.tripId);
     const trip = await getTrip(rawId);
     requireMembership(trip, req.user);
 
-    if (trip.isPrivate) {
-        const joinToken = await generateJoinToken(rawId);
-        return res.status(200).json({ value: joinToken, type: "joinToken" });
-    }
-
-    return res.status(200).json({
-        value: encodeId(rawId),
-        type: "encodedId",
-    });
+    const joinToken = await generateJoinToken(rawId);
+    return res.status(200).json({ value: joinToken, type: "joinToken" });
 });
 
 /**

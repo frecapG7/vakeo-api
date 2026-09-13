@@ -330,10 +330,11 @@ describe("POST /trips/:tripId/share", () => {
         expect(body.value).toBe("mock-join-token");
     });
 
-    test("public trip: returns encodedId (member only)", async () => {
+    test("public trip: returns joinToken (universal token)", async () => {
         const encoded = encodeId("trip123");
         mockTripUserService.getTripUserByToken.mockResolvedValueOnce(memberUser);
         mockTripService.getTrip.mockResolvedValueOnce(fakeTrip());
+        mockJoinTokenService.generateJoinToken.mockResolvedValueOnce("mock-join-token");
 
         const res = await fetch(`${baseUrl}/trips/${encoded}/share`, {
             method: "POST",
@@ -341,8 +342,8 @@ describe("POST /trips/:tripId/share", () => {
         });
         expect(res.status).toBe(200);
         const body = await res.json();
-        expect(body.type).toBe("encodedId");
-        expect(body.value).toBeDefined();
+        expect(body.type).toBe("joinToken");
+        expect(body.value).toBe("mock-join-token");
     });
 
     test("non-member gets 403", async () => {

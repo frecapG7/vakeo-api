@@ -7,6 +7,16 @@ export const getTripUserById = async (id) => {
 }
 
 /**
+ * Look up a TripUser by id, including the token field.
+ * Used by the migrate endpoint to check if a seat already has a token.
+ * @param {string} id
+ * @returns {Promise<object|null>}
+ */
+export const getTripUserWithToken = async (id) => {
+    return await TripUser.findById(id).select("+token");
+}
+
+/**
  * Look up a TripUser by their secret token (v3 auth).
  * @param {string} token
  * @returns {Promise<object|null>}
