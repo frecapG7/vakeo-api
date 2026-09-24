@@ -1,3 +1,6 @@
+import mongoose from "mongoose";
+import Trip from "../models/tripModel.mjs";
+import { InvalidError } from "../utils/errors.mjs";
 import TripUser from "../models/tripUserModel.mjs";
 import crypto from "node:crypto";
 
@@ -77,9 +80,9 @@ export const createTripUsers = async (users = []) => {
     return savedUsers;
 }
 
-export const createTripUser = async (user) => {
+export const createTripUser = async (user, options = {}) => {
     const newUser = buildTripUser(user);
-    return await newUser.save()
+    return await newUser.save(options);
 }
 
 
@@ -88,4 +91,49 @@ export const buildTripUser = ({name, avatar}) => {
         name,
         avatar,
     });
+}
+
+/**
+ * Create new seats and attach them to a trip in a single transaction.
+ * Every entry is validated before any write; the seats are appended in one
+ * conditional update that only matches while there is room for all of them,
+ * so concurrent calls cannot exceed the 20-seat limit and a refused or
+ * failed append rolls back the created TripUsers (no orphaned seats).
+ * @param {string} tripId
+ * @param {Array} users - [{ name, avatar }]
+ * @returns {Promise<object[]>} the created TripUsers, in payload order
+ */
+export const addSeatsToTrip = async (tripId, users) => {
+    if (!Array.isArray(users) || users.length === 0)
+        throw new InvalidError("Cannot add users: `users` must be a non-empty array");
+    for (const user of users) {
+        if (user?._id)
+            throw new InvalidError("Cannot add users: entries with `_id` are not supported — updates go through PUT /trips/:tripId/users/:tripUserId");
+        if (!user?.name)
+            throw new InvalidError("Cannot add user: `name` is required");
+    }
+
+    const session = await mongoose.startSession();
+    let savedUsers = null;
+    try {
+        await session.withTransaction(async () => {
+            savedUsers = [];
+            const newIds = [];
+            for (const user of users) {
+                const newUser = await createTripUser(user, { session });
+                newIds.push(newUser._id);
+                savedUsers.push(newUser);
+            }
+            const result = await Trip.updateOne(
+                { _id: tripId, $expr: { $lte: [{ $size: "$users" }, 20 - newIds.length] } },
+                { $push: { users: { $each: newIds } } },
+                { session }
+            );
+            if (result.modifiedCount === 0)
+                throw new InvalidError("Cannot add user: trip already has the maximum number of users");
+        });
+        return savedUsers;
+    } finally {
+        await session.endSession();
+    }
 }

@@ -1,11 +1,11 @@
 import express from "express";
 import { getTrip } from "../../services/tripService.mjs";
 import TripUser from "../../models/tripUserModel.mjs";
-import { createTripUser, getTripUserById, getTripUserByToken, rotateTripUserToken } from "../../services/tripUserService.mjs";
+import { addSeatsToTrip, getTripUserById, getTripUserByToken, rotateTripUserToken } from "../../services/tripUserService.mjs";
 import { resolveEncodedTripId } from "../../services/idEncoderService.mjs";
-import { requireMembership, requireReadAccess } from "../../services/validationService.mjs";
+import { requireMembership, requireReadAccess, requireSeatOwnership } from "../../services/validationService.mjs";
 import { auth, optionalAuth } from "./auth.mjs";
-import { ForbiddenError, InvalidError } from "../../utils/errors.mjs";
+import { ForbiddenError, NotFoundError } from "../../utils/errors.mjs";
 
 const app = express();
 
@@ -36,59 +36,28 @@ app.get("/trips/:tripId/users/:tripUserId", optionalAuth, async (req, res) => {
     const trip = await getTrip(rawId);
     requireReadAccess(trip, req.user);
     const user = await getTripUserById(req.params.tripUserId);
+    if (!user || !trip.users.some(u => u.toString() === String(user._id)))
+        throw new NotFoundError(`User ${req.params.tripUserId} not found in trip ${trip._id}`);
+
     return res.status(200).json(user);
 });
 
 /**
- * POST /trips/:tripId/users — add a user to a public trip (member only).
- * Private trips use the join capability (M4).
+ * POST /trips/:tripId/users/bulk — add seats in bulk (member only).
+ * Creates all seats or none: every entry is validated first, then the
+ * creation runs in a single transaction so the 20-seat limit is enforced
+ * atomically and a failure never leaves orphaned seats.
+ * Seat updates go through PUT /trips/:tripId/users/:tripUserId.
+ * @body {object[]} users - [{ name, avatar }]
+ * @returns {object[]} - the created seats
  */
-app.post("/trips/:tripId/users", auth, async (req, res) => {
-    const rawId = resolveEncodedTripId(req.params.tripId);
-    const trip = await getTrip(rawId);
-    requireMembership(trip, req.user);
-    if (trip.isPrivate)
-        throw new ForbiddenError("Cannot add user on private trip — use join capability");
-    if (trip.users.length >= 20)
-        throw new InvalidError("Cannot add user: trip already has the maximum number of users");
-
-    const newUser = await createTripUser(req.body);
-    trip.users.push(newUser._id);
-    const savedTrip = await trip.save();
-    await savedTrip.populate("users");
-    return res.status(200).json(savedTrip);
-});
-
-/**
- * PUT /trips/:tripId/users — bulk update users (member only).
- */
-app.put("/trips/:tripId/users", auth, async (req, res) => {
+app.post("/trips/:tripId/users/bulk", auth, async (req, res) => {
     const rawId = resolveEncodedTripId(req.params.tripId);
     const trip = await getTrip(rawId);
     requireMembership(trip, req.user);
 
-    const newUserCount = req.body.users.filter(u => !u._id).length;
-    if (trip.users.length + newUserCount > 20)
-        throw new InvalidError("Cannot add user: trip already has the maximum number of users");
-
-    const users = req.body.users.map(async (user) => {
-        let dbUser;
-        if (user._id) {
-            if (!trip.users.some(u => u.toString() === String(user._id)))
-                throw new ForbiddenError(`Cannot update list of users: user ${user._id} is no part of the trip ${trip._id}`);
-            dbUser = await getTripUserById(user._id);
-        } else {
-            dbUser = await createTripUser(user);
-            trip.users.push(dbUser._id);
-        }
-        dbUser.name = user.name ?? dbUser.name;
-        dbUser.avatar = user.avatar ?? dbUser.avatar;
-        return await dbUser.save();
-    });
-
-    const savedUsers = await Promise.all(users);
-    await trip.save();
-    return res.status(200).json(savedUsers);
+    const savedUsers = await addSeatsToTrip(rawId, req.body?.users);
+    return res.status(201).json(savedUsers);
 });
 
 /**
@@ -112,7 +81,9 @@ app.put("/trips/:tripId/users/:tripUserId", auth, async (req, res) => {
 });
 
 /**
- * POST /trips/:tripId/users/:tripUserId/rotate-token — rotate a user's token (member only).
+ * POST /trips/:tripId/users/:tripUserId/rotate-token — rotate the caller's own token.
+ * Seat owner only: a member cannot rotate another seat's token. A different
+ * target would require a privileged role — none exists in v3.
  */
 app.post("/trips/:tripId/users/:tripUserId/rotate-token", auth, async (req, res) => {
     const rawId = resolveEncodedTripId(req.params.tripId);
@@ -121,6 +92,8 @@ app.post("/trips/:tripId/users/:tripUserId/rotate-token", auth, async (req, res)
 
     if (!trip.users.some(u => u.toString() === String(req.params.tripUserId)))
         throw new ForbiddenError(`User ${req.params.tripUserId} is not part of trip ${trip._id}`);
+
+    requireSeatOwnership(req.user, req.params.tripUserId);
 
     const newToken = await rotateTripUserToken(req.params.tripUserId);
     return res.status(200).json({ token: newToken });

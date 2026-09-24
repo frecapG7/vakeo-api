@@ -6,7 +6,7 @@ const mockTripUserService = {
     createTripUsers: jest.fn(),
     getTripUserByToken: jest.fn(),
     getTripUserById: jest.fn(),
-    createTripUser: jest.fn(),
+    addSeatsToTrip: jest.fn(),
     rotateTripUserToken: jest.fn(),
     claimSeat: jest.fn(),
     releaseSeat: jest.fn(),
@@ -428,9 +428,9 @@ describe("POST /trips/:tripId/join", () => {
         const encoded = encodeId("trip123");
         const trip = { ...fakeTrip(), save: async () => {} };
         mockTripService.getTrip.mockResolvedValueOnce(trip);
-        mockTripUserService.createTripUser.mockResolvedValueOnce({
+        mockTripUserService.addSeatsToTrip.mockResolvedValueOnce([{
             _id: "newuser", name: "Charlie", avatar: "avatar",
-        });
+        }]);
         mockTripUserService.claimSeat.mockResolvedValueOnce({
             _id: "newuser", name: "Charlie", avatar: "avatar", token: "tok-charlie",
         });

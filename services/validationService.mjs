@@ -49,3 +49,15 @@ export const requireReadAccess = (trip, user) => {
         return;
     requireMembership(trip, user);
 }
+/**
+ * Gate for seat-scoped actions (v3): only the seat's owner may act.
+ * Targeting another member's seat requires a privileged role — v3 has no
+ * role system, so every other-target request is refused. Extend this gate
+ * when roles (UserAccount) are introduced.
+ * @param {object} user - authenticated TripUser
+ * @param {string} targetTripUserId - seat targeted by the request
+ */
+export const requireSeatOwnership = (user, targetTripUserId) => {
+    if (String(user?._id) !== String(targetTripUserId))
+        throw new ForbiddenError("Only the seat owner can perform this action");
+}

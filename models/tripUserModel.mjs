@@ -24,9 +24,11 @@ const tripUserSchema = new mongoose.Schema({
     },
     token: {
         type: String,
-        index: true,
-        unique: true,
         select: false,
+        index: {
+            unique: true,
+            partialFilterExpression: { token: { $type: "string" } },
+        },
     }
 });
 

@@ -7,7 +7,7 @@ import {
     dashboard,
     search,
 } from "../../services/tripService.mjs";
-import { createTripUsers, createTripUser, claimSeat, releaseSeat } from "../../services/tripUserService.mjs";
+import { createTripUsers, claimSeat, releaseSeat, addSeatsToTrip } from "../../services/tripUserService.mjs";
 import { generateJoinToken, verifyJoinToken } from "../../services/joinTokenService.mjs";
 import { encodeId, resolveEncodedTripId } from "../../services/idEncoderService.mjs";
 import { requireMembership, requireReadAccess } from "../../services/validationService.mjs";
@@ -51,8 +51,8 @@ app.get("/", optionalAuth, async (req, res) => {
  * @returns {object} - created trip with encodedId, seats, and creator credentials
  */
 app.post("/", async (req, res) => {
-    const { users } = req.body;
-    if (users?.length === 0 || users?.length > 20)
+    const { users } = req.body ?? {};
+    if (!Array.isArray(users) || users.length === 0 || users.length > 20)
         throw new InvalidError("Cannot create trip: a trip must have between 1 and 20 users");
 
     const tripUsers = await createTripUsers(users);
@@ -201,13 +201,11 @@ app.post("/:tripId/join", async (req, res) => {
     }
 
     if (name) {
-        // Create a new seat
+        // Create a new seat (transactional: the 20-seat limit is enforced atomically)
         if (trip.users.length >= 20)
             throw new InvalidError("Cannot join: trip already has the maximum number of users");
 
-        const newUser = await createTripUser({ name, avatar });
-        trip.users.push(newUser._id);
-        await trip.save();
+        const [newUser] = await addSeatsToTrip(rawId, [{ name, avatar }]);
 
         // Mint token on the new seat
         const claimed = await claimSeat(newUser._id);

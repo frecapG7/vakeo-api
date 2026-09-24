@@ -4,12 +4,12 @@ import { buildTripUser } from "./tripUserService.mjs";
 
 describe("TripUser token — model & service (seat model)", () => {
 
-    test("schema has token field with select:false, unique, indexed", () => {
+    test("schema has token field with select:false and partial unique index", () => {
         const tokenPath = TripUser.schema.path("token");
         expect(tokenPath).toBeDefined();
         expect(tokenPath.options.select).toBe(false);
-        expect(tokenPath.options.unique).toBe(true);
-        expect(tokenPath.options.index).toBe(true);
+        expect(tokenPath.options.index.unique).toBe(true);
+        expect(tokenPath.options.index.partialFilterExpression).toEqual({ token: { $type: "string" } });
     });
 
     test("schema has no default for token (seats start free)", () => {
