@@ -7,6 +7,7 @@ import {
 import { resolveEncodedTripId } from "../../services/idEncoderService.mjs";
 import { requireMembership, requireReadAccess } from "../../services/validationService.mjs";
 import { auth, optionalAuth } from "./auth.mjs";
+import { buildCursor, sanitizeLimit } from "../../utils/pagination.mjs";
 
 const app = express();
 
@@ -19,10 +20,13 @@ app.get("/trips/:tripId/messages", optionalAuth, async (req, res) => {
     const trip = await getTrip(rawId);
     requireReadAccess(trip, req.user);
     const { cursor, limit = 10 } = req.query;
-    const messages = await search(rawId, cursor, limit);
-    const prevCursor = messages.length > 0 ? messages[0]._id : null;
-    const nextCursor = messages.length > 0 ? messages[messages.length - 1]._id : null;
-    return res.status(200).json({ nextCursor, prevCursor, totalResults: messages.length, messages });
+    const sanitizedLimit = sanitizeLimit(limit);
+    const messages = await search(rawId, cursor, sanitizedLimit);
+    const nextCursor = messages?.length === sanitizedLimit ? buildCursor({
+        _id: messages[messages.length - 1]?._id,
+        createdAt: messages[messages.length - 1]?.createdAt
+    }) : null;
+    return res.status(200).json({ nextCursor, totalResults: messages?.length, messages });
 });
 
 /**
@@ -33,10 +37,13 @@ app.get("/trips/:tripId/messages/general", optionalAuth, async (req, res) => {
     const trip = await getTrip(rawId);
     requireReadAccess(trip, req.user);
     const { cursor, limit = 10 } = req.query;
-    const messages = await search(rawId, cursor, limit, null);
-    const prevCursor = messages.length > 0 ? messages[0]._id : null;
-    const nextCursor = messages.length > 0 ? messages[messages.length - 1]._id : null;
-    return res.status(200).json({ nextCursor, prevCursor, totalResults: messages.length, messages });
+    const sanitizedLimit = sanitizeLimit(limit);
+    const messages = await search(rawId, cursor, sanitizedLimit, null);
+    const nextCursor = messages?.length === sanitizedLimit ? buildCursor({
+        _id: messages[messages.length - 1]?._id,
+        createdAt: messages[messages.length - 1]?.createdAt
+    }) : null;
+    return res.status(200).json({ nextCursor, totalResults: messages?.length, messages });
 });
 
 /**
@@ -47,10 +54,13 @@ app.get("/trips/:tripId/events/:eventId/messages", optionalAuth, async (req, res
     const trip = await getTrip(rawId);
     requireReadAccess(trip, req.user);
     const { cursor, limit = 10 } = req.query;
-    const messages = await search(rawId, cursor, limit, req.params.eventId);
-    const prevCursor = messages.length > 0 ? messages[0]._id : null;
-    const nextCursor = messages.length > 0 ? messages[messages.length - 1]._id : null;
-    return res.status(200).json({ nextCursor, prevCursor, totalResults: messages.length, messages });
+    const sanitizedLimit = sanitizeLimit(limit);
+    const messages = await search(rawId, cursor, sanitizedLimit, req.params.eventId);
+    const nextCursor = messages?.length === sanitizedLimit ? buildCursor({
+        _id: messages[messages.length - 1]?._id,
+        createdAt: messages[messages.length - 1]?.createdAt
+    }) : null;
+    return res.status(200).json({ nextCursor, totalResults: messages?.length, messages });
 });
 
 /**

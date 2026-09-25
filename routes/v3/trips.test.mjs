@@ -1,4 +1,5 @@
 import { jest } from "@jest/globals";
+import { InvalidError } from "../../utils/errors.mjs";
 
 // --- Mock the DB-dependent services ---
 // All functions the v3 trips route and the passport strategy touch go here.
@@ -18,7 +19,7 @@ const mockTripService = {
     deleteTrip: jest.fn(),
     updateTrip: jest.fn(),
     dashboard: jest.fn(),
-    search: jest.fn(),
+    batchHydrate: jest.fn(),
 };
 
 const mockJoinTokenService = {
@@ -257,57 +258,41 @@ describe("DELETE /trips/:tripId (auth + membership)", () => {
 });
 
 
-describe("GET /trips (search — visibility-filtered)", () => {
+describe("POST /trips/batch (delegates to tripService.batchHydrate)", () => {
 
-    test("returns empty when no ids provided (anonymous OK)", async () => {
-        const res = await fetch(`${baseUrl}/trips`);
-        expect(res.status).toBe(200);
-        expect(await res.json()).toEqual([]);
-    });
+    test("returns the trips hydrated by the service", async () => {
+        mockTripService.batchHydrate.mockResolvedValueOnce([
+            { _id: "pub1", name: "Public", isPrivate: false },
+        ]);
 
-    test("anonymous can see public trips in search results", async () => {
-        const pubTrip = { _id: "pub1", name: "Public", isPrivate: false, users: ["m1"] };
-        const privTrip = { _id: "priv1", name: "Private", isPrivate: true, users: ["m1"] };
-        mockTripService.search.mockResolvedValueOnce([pubTrip, privTrip]);
-
-        const res = await fetch(`${baseUrl}/trips?ids=${encodeId("pub1")},${encodeId("priv1")}`);
-        expect(res.status).toBe(200);
-        const body = await res.json();
-        expect(body).toHaveLength(1);
-        expect(body[0].name).toBe("Public");
-    });
-
-    test("member sees both public and private trips they belong to", async () => {
-        const pubTrip = { _id: "pub1", name: "Public", isPrivate: false, users: ["member1"] };
-        const privTrip = { _id: "priv1", name: "Private", isPrivate: true, users: ["member1"] };
-        mockTripUserService.getTripUserByToken.mockResolvedValueOnce({
-            _id: "member1", name: "Alice", token: "tok-alice",
-        });
-        mockTripService.search.mockResolvedValueOnce([pubTrip, privTrip]);
-
-        const res = await fetch(`${baseUrl}/trips?ids=${encodeId("pub1")},${encodeId("priv1")}`, {
-            headers: { "x-user-token": "tok-alice" },
+        const res = await fetch(`${baseUrl}/trips/batch`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                trips: [{ id: "any" }, { id: "other", token: "tok" }],
+            }),
         });
         expect(res.status).toBe(200);
         const body = await res.json();
-        expect(body).toHaveLength(2);
+        expect(body.trips).toHaveLength(1);
+        expect(body.trips[0].name).toBe("Public");
+        expect(mockTripService.batchHydrate).toHaveBeenCalledWith([
+            { id: "any" },
+            { id: "other", token: "tok" },
+        ]);
     });
 
-    test("non-member sees only public trips", async () => {
-        const pubTrip = { _id: "pub1", name: "Public", isPrivate: false, users: ["member1"] };
-        const privTrip = { _id: "priv1", name: "Private", isPrivate: true, users: ["member1"] };
-        mockTripUserService.getTripUserByToken.mockResolvedValueOnce({
-            _id: "stranger", name: "Stranger", token: "tok-stranger",
-        });
-        mockTripService.search.mockResolvedValueOnce([pubTrip, privTrip]);
+    test("propagates the service validation error (422)", async () => {
+        mockTripService.batchHydrate.mockRejectedValueOnce(
+            new InvalidError("Cannot fetch trips: `trips` must be a non-empty array")
+        );
 
-        const res = await fetch(`${baseUrl}/trips?ids=${encodeId("pub1")},${encodeId("priv1")}`, {
-            headers: { "x-user-token": "tok-stranger" },
+        const res = await fetch(`${baseUrl}/trips/batch`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
         });
-        expect(res.status).toBe(200);
-        const body = await res.json();
-        expect(body).toHaveLength(1);
-        expect(body[0].name).toBe("Public");
+        expect(res.status).toBe(422);
     });
 });
 

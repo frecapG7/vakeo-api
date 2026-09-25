@@ -4,11 +4,12 @@ import Good from "../models/goodModel.mjs";
 import Event from "../models/eventModel.mjs";
 import Link from "../models/linkModel.mjs";
 import { Poll } from "../models/pollModel.mjs";
-import { NotFoundError } from "../utils/errors.mjs";
+import { InvalidError, NotFoundError } from "../utils/errors.mjs";
 import { sanitizeSearchText } from "../utils/pagination.mjs";
+import { resolveEncodedTripId } from "./idEncoderService.mjs";
+import { getTripUsersByTokens } from "./tripUserService.mjs";
 import { verifyDates } from "./validationService.mjs";
 import TripUser from "../models/tripUserModel.mjs";
-import { createTripUser } from "./tripUserService.mjs";
 
 export const search = async ({ ids, search }) => {
 
@@ -26,7 +27,7 @@ export const search = async ({ ids, search }) => {
 
   const trips = await Trip.find(
     query,
-    "users name image startDate endDate createdAt", {
+    "users name image startDate endDate createdAt isPrivate", {
     limit: 20,
     sort: {
       createdAt: -1
@@ -36,6 +37,58 @@ export const search = async ({ ids, search }) => {
 
   return trips;
 
+}
+
+/**
+ * Batch-hydrate trips for the v3 client, each entry carrying its own credential.
+ * v3 identity is a per-trip seat token, so membership is proven per item.
+ * - Fail-closed: malformed ids, missing `id`, or duplicated ids reject the whole
+ *   batch (422) — no partial reads.
+ * - Visibility is enforced inside the trips query: a seat belongs to a single
+ *   trip, so holding a seat token proves membership, and private trips without
+ *   one of the caller's seats never leave the database. Must stay in sync with
+ *   `canReadTrip` (validationService).
+ * - Invisible trips (not found, invalid token, non-member) are silently omitted;
+ *   distinguishing them would leak the existence of private trips.
+ * @param {Array} entries - [{ id: encoded trip id, token?: seat token }] (1-30 entries)
+ * @returns {Promise<object[]>} trips the caller can read, users populated
+ */
+export const batchHydrate = async (entries) => {
+  if (!Array.isArray(entries) || entries.length === 0)
+    throw new InvalidError("Cannot fetch trips: `trips` must be a non-empty array");
+  if (entries.length > 30)
+    throw new InvalidError("Cannot fetch trips: batch is limited to 30 trips");
+
+  // rawId -> seat token
+  const entriesByRawId = new Map();
+  for (const { id, token } of entries) {
+    if (!id)
+      throw new InvalidError("Cannot fetch trips: each entry requires an `id`");
+    const rawId = resolveEncodedTripId(id);
+    if (entriesByRawId.has(rawId))
+      throw new InvalidError("Cannot fetch trips: duplicated `id` in batch");
+    entriesByRawId.set(rawId, token ?? null);
+  }
+
+  const tokens = [...new Set([...entriesByRawId.values()].filter(Boolean))];
+  const seats = await getTripUsersByTokens(tokens);
+
+  const found = await Trip.find(
+    {
+      _id: { $in: [...entriesByRawId.keys()] },
+      $or: [
+        { isPrivate: { $ne: true } },
+        { users: { $in: seats.map((s) => s._id) } }
+      ]
+    },
+    "users name image startDate endDate createdAt isPrivate"
+  ).populate("users", "avatar name");
+
+  // Respond in batch order
+  const byId = new Map(found.map((t) => [String(t._id), t]));
+  return [...entriesByRawId.keys()]
+    .filter((rawId) => byId.has(rawId))
+    .map((rawId) => byId.get(rawId));
 }
 
 export const getTrip = async (id, includeStops = false) => {
@@ -75,10 +128,6 @@ export const updateTrip = async (trip, { name, description, users, image, startD
   trip.endDate = endDate;
   trip.location = location;
   trip.isPrivate = isPrivate;
-
-  const savedUsers = await Promise.all(users?.filter?.(user => !user._id)
-    .map(user => createTripUser(user)));
-  trip.users.push(...savedUsers.map(u => u._id));
 
   return await trip.save();
 }

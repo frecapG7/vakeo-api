@@ -26,3 +26,11 @@ export class ForbiddenError extends Error {
         this.statusCode = 403
     }
 }
+
+export class NotImplementedError extends Error {
+    constructor(message){
+        super(message);
+        this.name = "NotImplementedError";
+        this.statusCode = 501
+    }
+}

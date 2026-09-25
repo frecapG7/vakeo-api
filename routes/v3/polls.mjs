@@ -4,6 +4,7 @@ import { getTrip } from "../../services/tripService.mjs";
 import { resolveEncodedTripId } from "../../services/idEncoderService.mjs";
 import { requireMembership, requireReadAccess } from "../../services/validationService.mjs";
 import { auth, optionalAuth } from "./auth.mjs";
+import { buildCursor, sanitizeLimit } from "../../utils/pagination.mjs";
 
 const app = express();
 
@@ -15,12 +16,15 @@ app.get("/trips/:tripId/polls", optionalAuth, async (req, res) => {
     const rawId = resolveEncodedTripId(req.params.tripId);
     const trip = await getTrip(rawId);
     requireReadAccess(trip, req.user);
-    const polls = await searchPolls(rawId, req.query);
+    const { limit = 10 } = req?.query;
+    const sanitizedLimit = sanitizeLimit(limit);
+    const polls = await searchPolls(rawId, { ...req.query, limit: sanitizedLimit });
 
-    const prevCursor = polls.length > 0 ? polls[0]._id : null;
-    const nextCursor = polls.length > 0 ? polls[polls.length - 1]._id : null;
+    const nextCursor = polls?.length === sanitizedLimit ? buildCursor({
+        _id: polls[polls.length - 1]?._id
+    }) : null;
 
-    return res.status(200).json({ nextCursor, prevCursor, totalResults: polls.length, polls });
+    return res.status(200).json({ nextCursor, totalResults: polls?.length, polls });
 });
 
 /**

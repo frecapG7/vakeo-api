@@ -5,7 +5,7 @@ import {
     deleteTrip,
     updateTrip,
     dashboard,
-    search,
+    batchHydrate,
 } from "../../services/tripService.mjs";
 import { createTripUsers, claimSeat, releaseSeat, addSeatsToTrip } from "../../services/tripUserService.mjs";
 import { generateJoinToken, verifyJoinToken } from "../../services/joinTokenService.mjs";
@@ -17,30 +17,18 @@ import { InvalidError, ForbiddenError } from "../../utils/errors.mjs";
 const app = express();
 
 /**
- * GET / — search trips (filtered to trips the caller can read).
- * Public trips are visible to all; private trips only to members.
- * @query {string} ids - comma-separated encoded trip ids
- * @query {string} search - text filter on trip name
- * @returns {object[]} - trips visible to the caller
+ * POST /batch — hydrate several trips at once, each entry with its own credential.
+ * v3 identity is a per-trip seat token, so membership can only be proven per item:
+ * every entry carries the encoded trip id and, for private trips, the seat token
+ * associated with that trip. Fail-closed on malformed ids (422). Invisible trips
+ * (not found, invalid token, non-member) are silently omitted — distinguishing
+ * them would leak the existence of private trips.
+ * @body {object[]} trips - [{ id, token? }] (1-30 entries, ids must be unique)
+ * @returns {object} - { trips } — only the trips the caller can read
  */
-app.get("/", optionalAuth, async (req, res) => {
-    const { ids, ...rest } = req.query;
-    if (!ids)
-        return res.status(200).json([]);
-
-    const rawIds = ids.split(",").map((e) => resolveEncodedTripId(e));
-    const trips = await search({ ids: rawIds.join(","), ...rest });
-
-    const visible = trips.filter((t) => {
-        if (!t.isPrivate) return true;
-        if (!req.user) return false;
-        return t.users.some((u) => {
-            const uid = u?._id?.toString() || u?.toString();
-            return uid === String(req.user._id);
-        });
-    });
-
-    return res.status(200).json(visible);
+app.post("/batch", async (req, res) => {
+    const { trips } = req.body ?? {};
+    return res.status(200).json({ trips: await batchHydrate(trips) });
 });
 
 /**

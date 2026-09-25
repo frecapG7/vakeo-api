@@ -5,7 +5,7 @@ import { resolveEncodedTripId } from "../../services/idEncoderService.mjs";
 import { requireMembership, requireReadAccess } from "../../services/validationService.mjs";
 import { auth, optionalAuth } from "./auth.mjs";
 import { buildCursor, sanitizeLimit } from "../../utils/pagination.mjs";
-import { ForbiddenError } from "../../utils/errors.mjs";
+import { ForbiddenError, NotImplementedError } from "../../utils/errors.mjs";
 
 const app = express();
 
@@ -75,9 +75,8 @@ app.delete("/trips/:tripId/events/:eventId", auth, async (req, res) => {
 
     if (event?.owners?.filter(u => u._id.equals(req.user._id)).length === 0)
         throw new ForbiddenError("Only an event owner can delete it");
-
-    throw new ForbiddenError("Not implemented")
-    return res.status(204).send();
+    // Not Implemented
+    throw new NotImplementedError("This feature is not yet implemented")
 });
 
 export default app;

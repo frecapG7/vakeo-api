@@ -30,6 +30,16 @@ export const getTripUserByToken = async (token) => {
 }
 
 /**
+ * Look up TripUsers by their secret tokens in a single query (batch hydrate).
+ * @param {string[]} tokens
+ * @returns {Promise<object[]>} the matching TripUsers, with token selected
+ */
+export const getTripUsersByTokens = async (tokens) => {
+    if (!tokens?.length) return [];
+    return await TripUser.find({ token: { $in: tokens } }).select("+token");
+}
+
+/**
  * Mint a fresh token for a TripUser, replacing the old one.
  * @param {string} tripUserId
  * @returns {Promise<string>} the new token
