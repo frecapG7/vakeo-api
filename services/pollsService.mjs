@@ -62,6 +62,8 @@ export const searchPolls = async (tripId, { limit, cursor, sort = "asc", type, e
     if (cursor) {
         try {
             const cursorData = readCursor(cursor);
+            if(!cursorData?._id)
+                throw new InvalidError("Invalid cursor format")
             const cursorId = new ObjectId(cursorData?._id);
             query._id = sort === "asc" ? { $gt: cursorId } : { $lt: cursorId };
         } catch (e) {
