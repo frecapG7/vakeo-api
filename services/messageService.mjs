@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
 import Message from "../models/messageModel.mjs";
 import Event from "../models/eventModel.mjs";
+import { InvalidError } from "../utils/errors.mjs";
+import { readCursor } from "../utils/pagination.mjs";
 
 export const createMessage = async (trip, { text = "", user, event = null }) => {
     // Validate event belongs to trip if provided
@@ -27,8 +29,15 @@ export const search = async (tripId, cursor, limit, eventId = null) => {
         event: eventId
     };
 
-    if (cursor)
-        query._id = { $lt: cursor }
+    if (cursor) {
+        const cursorData = readCursor(cursor);
+        if (!cursorData?._id || !cursorData?.createdAt)
+            throw new InvalidError("Invalid cursor format");
+        query.$or = [
+            { createdAt: { $lt: cursorData.createdAt } },
+            { createdAt: cursorData.createdAt, _id: { $lt: cursorData._id } }
+        ]
+    }
 
     if (limit > 100) {
         console.warn("Maximum limit for messages is 100");
@@ -38,7 +47,8 @@ export const search = async (tripId, cursor, limit, eventId = null) => {
     const messages = await Message.find(query, 'text createdAt readBy', {
         limit,
         sort: {
-            createdAt: -1
+            createdAt: -1,
+            _id: -1
         }
     }).populate("user", "name avatar");
 

@@ -85,36 +85,36 @@ const createTripStop = async (tripId, stop, user) => {
   if (!trip) throw new NotFoundError(`Trip ${tripId} not found`);
   verifyUser(trip, user);
 
-  const stopCount = await TripStop.countDocuments({ trip: tripId });
-  if (stopCount >= 50) {
-    throw new InvalidError("Cannot add more than 50 stops to a trip");
-  }
-
   const { name, location, accommodation } = stop;
 
   const session = await mongoose.startSession();
   try {
-    session.startTransaction();
+    let newStop;
+    await session.withTransaction(async () => {
+      // Serialize concurrent stop creations: every create writes the trip document,
+      // so concurrent transactions conflict here and retry against a fresh
+      // snapshot before the 50-stop limit is re-checked below.
+      await Trip.updateOne({ _id: tripId }, { $set: { updatedAt: new Date() } }, { session });
+      const stopCount = await TripStop.countDocuments({ trip: tripId }, { session });
+      if (stopCount >= 50) {
+        throw new InvalidError("Cannot add more than 50 stops to a trip");
+      }
 
-    const accommodationId = await syncAccommodation(tripId, null, accommodation, session);
-    const newStop = await new TripStop({
-      name,
-      location,
-      accommodation: accommodationId,
-      trip: tripId,
-      createdBy: user._id,
-      modifiedBy: user._id
-    }).save({ session });
-    await session.commitTransaction();
+      const accommodationId = await syncAccommodation(tripId, null, accommodation, session);
+      newStop = await new TripStop({
+        name,
+        location,
+        accommodation: accommodationId,
+        trip: tripId,
+        createdBy: user._id,
+        modifiedBy: user._id
+      }).save({ session });
+    });
     return newStop;
-  } catch (error) {
-    await session.abortTransaction();
-    throw error;
   } finally {
-    session.endSession();
+    await session.endSession();
   }
 };
-
 
 // Update a stop
 const updateTripStop = async (tripId, stopId, stopData, user) => {
@@ -133,19 +133,18 @@ const updateTripStop = async (tripId, stopId, stopData, user) => {
     accommodation: newAccommodation
   } = stopData;
 
-
   const session = await mongoose.startSession();
   try {
-    session.startTransaction();
+    let newStop;
+    await session.withTransaction(async () => {
+      if (newAccommodation !== undefined)
+        stop.accommodation = await syncAccommodation(tripId, stop?.accommodation, newAccommodation, session);
+      stop.name = name;
+      stop.location = location;
+      stop.modifiedBy = user._id;
 
-    if (newAccommodation !== undefined)
-      stop.accommodation = await syncAccommodation(tripId, stop?.accommodation, newAccommodation, session);
-    stop.name = name;
-    stop.location = location;
-    stop.modifiedBy = user._id;
-
-    const newStop = await stop.save({ session });
-    await session.commitTransaction();
+      newStop = await stop.save({ session });
+    });
 
     await newStop.populate([{
       path: "polls",
@@ -156,11 +155,8 @@ const updateTripStop = async (tripId, stopId, stopData, user) => {
       path: "accommodation"
     }]);
     return newStop;
-  } catch (error) {
-    await session.abortTransaction();
-    throw error;
   } finally {
-    session.endSession();
+    await session.endSession();
   }
 };
 
@@ -179,28 +175,22 @@ const deleteTripStop = async (tripId, stopId, user) => {
 
   const session = await mongoose.startSession();
   try {
-    session.startTransaction();
-    const accommodationId = stop.accommodation?._id ?? stop.accommodation; // Work if field is populated or not 
-    if (accommodationId)
-      await Link.deleteOne({
-        _id: accommodationId,
-        trip: tripId,
-        type: "accommodation"
-      }, { session });
-    const result = await TripStop.deleteOne({ _id: stopId, trip: tripId }, { session });
-    if (result.deletedCount === 0)
-      throw new NotFoundError(`Stop ${stopId} not found in trip ${tripId}`);
-
-    await session.commitTransaction();
-
-  } catch (error) {
-    await session.abortTransaction();
-    throw error;
+    await session.withTransaction(async () => {
+      const accommodationId = stop.accommodation?._id ?? stop.accommodation; // Work if field is populated or not
+      if (accommodationId)
+        await Link.deleteOne({
+          _id: accommodationId,
+          trip: tripId,
+          type: "accommodation"
+        }, { session });
+      const result = await TripStop.deleteOne({ _id: stopId, trip: tripId }, { session });
+      if (result.deletedCount === 0)
+        throw new NotFoundError(`Stop ${stopId} not found in trip ${tripId}`);
+    });
   } finally {
     await session.endSession();
   }
-
-};
+}
 
 export {
   getTripStops,

@@ -1,6 +1,10 @@
 import dotenv from "dotenv";
 dotenv.config();
 
+const tokenSecret = process.env.TOKEN_SECRET;
+if (typeof tokenSecret !== "string" || tokenSecret.length < 32)
+    throw new Error("TOKEN_SECRET is missing or too short (min 32 chars) - refusing to start");
+
 
 export default {
     port: process.env.PORT || 3000,
@@ -9,7 +13,7 @@ export default {
     api_key: process.env.API_KEY,
 
 
-    token_secret : process.env.TOKEN_SECRET,
+    token_secret: tokenSecret,
 
     db: {
         user: process.env.MONGODB_USER,
