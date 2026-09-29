@@ -24,7 +24,8 @@ const app = express();
  * (not found, invalid token, non-member) are silently omitted — distinguishing
  * them would leak the existence of private trips.
  * @body {object[]} trips - [{ id, token? }] (1-30 entries, ids must be unique)
- * @returns {object} - { trips } — only the trips the caller can read
+ * @returns {object} - { trips } — only the trips the caller can read,
+ *   each with an `encodedId` echoing the `id` the caller sent
  */
 app.post("/batch", async (req, res) => {
     const { trips } = req.body ?? {};
