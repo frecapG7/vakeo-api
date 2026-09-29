@@ -50,6 +50,9 @@ export const search = async ({ ids, search }) => {
  *   `canReadTrip` (validationService).
  * - Invisible trips (not found, invalid token, non-member) are silently omitted;
  *   distinguishing them would leak the existence of private trips.
+ * Each returned trip carries an `encodedId` field echoing the `id` the caller
+ * sent for it — `encodeId` uses a random IV, so re-encoding the raw id would
+ * produce a different string than the caller's input.
  * @param {Array} entries - [{ id: encoded trip id, token?: seat token }] (1-30 entries)
  * @returns {Promise<object[]>} trips the caller can read, users populated
  */
@@ -59,7 +62,7 @@ export const batchHydrate = async (entries) => {
   if (entries.length > 30)
     throw new InvalidError("Cannot fetch trips: batch is limited to 30 trips");
 
-  // rawId -> seat token
+  // rawId -> { encoded, token }
   const entriesByRawId = new Map();
   for (const { id, token } of entries) {
     if (!id)
@@ -67,10 +70,10 @@ export const batchHydrate = async (entries) => {
     const rawId = resolveEncodedTripId(id);
     if (entriesByRawId.has(rawId))
       throw new InvalidError("Cannot fetch trips: duplicated `id` in batch");
-    entriesByRawId.set(rawId, token ?? null);
+    entriesByRawId.set(rawId, { encoded: id, token: token ?? null });
   }
 
-  const tokens = [...new Set([...entriesByRawId.values()].filter(Boolean))];
+  const tokens = [...new Set([...entriesByRawId.values()].map((e) => e.token).filter(Boolean))];
   const seats = await getTripUsersByTokens(tokens);
 
   const found = await Trip.find(
@@ -84,11 +87,11 @@ export const batchHydrate = async (entries) => {
     "users name image startDate endDate createdAt isPrivate"
   ).populate("users", "avatar name");
 
-  // Respond in batch order
+  // Respond in batch order, echoing the caller's encoded id per trip
   const byId = new Map(found.map((t) => [String(t._id), t]));
-  return [...entriesByRawId.keys()]
-    .filter((rawId) => byId.has(rawId))
-    .map((rawId) => byId.get(rawId));
+  return [...entriesByRawId.entries()]
+    .filter(([rawId]) => byId.has(rawId))
+    .map(([rawId, { encoded }]) => ({ ...byId.get(rawId).toObject(), encodedId: encoded }));
 }
 
 export const getTrip = async (id, includeStops = false) => {
