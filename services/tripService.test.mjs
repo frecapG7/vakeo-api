@@ -25,6 +25,9 @@ beforeEach(() => {
     jest.clearAllMocks();
 });
 
+// Mongoose documents expose toObject(); batchHydrate spreads it into the response
+const doc = (o) => ({ ...o, toObject: () => o });
+
 describe("tripService", () => {
 
     test("module loads (smoke)", () => {
@@ -65,7 +68,7 @@ describe("tripService.batchHydrate (visibility — enforced in the query)", () =
         mockTripUserService.getTripUsersByTokens.mockResolvedValueOnce([]);
         mockTripFind.mockReturnValueOnce({
             populate: jest.fn().mockResolvedValue([
-                { _id: "pub1", name: "Public", isPrivate: false, users: ["m1"] },
+                doc({ _id: "pub1", name: "Public", isPrivate: false, users: ["m1"] }),
             ]),
         });
 
@@ -88,8 +91,8 @@ describe("tripService.batchHydrate (visibility — enforced in the query)", () =
         ]);
         mockTripFind.mockReturnValueOnce({
             populate: jest.fn().mockResolvedValue([
-                { _id: "pub1", name: "Public", isPrivate: false, users: ["member1"] },
-                { _id: "priv1", name: "Private", isPrivate: true, users: ["member1"] },
+                doc({ _id: "pub1", name: "Public", isPrivate: false, users: ["member1"] }),
+                doc({ _id: "priv1", name: "Private", isPrivate: true, users: ["member1"] }),
             ]),
         });
 
@@ -120,12 +123,27 @@ describe("tripService.batchHydrate (visibility — enforced in the query)", () =
         mockTripUserService.getTripUsersByTokens.mockResolvedValueOnce([]);
         mockTripFind.mockReturnValueOnce({
             populate: jest.fn().mockResolvedValue([
-                { _id: "pub2", name: "Second", isPrivate: false, users: [] },
-                { _id: "pub1", name: "First", isPrivate: false, users: [] },
+                doc({ _id: "pub2", name: "Second", isPrivate: false, users: [] }),
+                doc({ _id: "pub1", name: "First", isPrivate: false, users: [] }),
             ]),
         });
 
         const trips = await batchHydrate([{ id: encodeId("pub1") }, { id: encodeId("pub2") }]);
         expect(trips.map((t) => t.name)).toEqual(["First", "Second"]);
+    });
+
+    test("echoes the caller's encoded id on each returned trip", async () => {
+        mockTripUserService.getTripUsersByTokens.mockResolvedValueOnce([]);
+        mockTripFind.mockReturnValueOnce({
+            populate: jest.fn().mockResolvedValue([
+                doc({ _id: "pub1", name: "Public", isPrivate: false, users: [] }),
+            ]),
+        });
+
+        const encoded = encodeId("pub1");
+        const trips = await batchHydrate([{ id: encoded }]);
+        expect(trips).toHaveLength(1);
+        // Exact input string: encodeId uses a random IV, so re-encoding differs
+        expect(trips[0].encodedId).toBe(encoded);
     });
 });
