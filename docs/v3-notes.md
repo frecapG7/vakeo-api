@@ -52,8 +52,23 @@ Notes de contexte pour travailler sur l'API v3. Fichier maintenu à la main — 
 - v1 (`routes/*.mjs`) partage les services. `tripService.search` (utilisé par v1) a reçu `isPrivate` en projection — même fuite corrigée des deux côtés, mais v1 n'est pas "migrée".
 - `Trip.find` avec projection explicite : toujours vérifier que les champs testés en aval (`isPrivate` !) y figurent.
 
+## Contexte trip dans les routes v3 (`loadTripContext`)
+
+- Pattern standard pour toute route v3 scopée sur un trip : `const { rawId, trip } = await loadTripContext(req, requireReadAccess)` en première ligne du handler (`services/tripContextService.mjs`). Résout l'id chiffré, charge le trip, applique le garde (`requireReadAccess` ou `requireMembership` de `validationService`), retourne `{ rawId, trip }`. Erreurs : `InvalidError` (id altéré, 422), trip introuvable (404), `ForbiddenError` (403).
+- Garde passé explicitement en paramètre (choix délibéré vs middleware `req.tripContext`) : une route de lecture sans garde saute aux yeux au review au lieu d'être silencieusement publique.
+- Migrations opportunistes restantes (prélude manuel `resolveEncodedTripId` + `getTrip` + garde, à remplacer au passage quand on touche le fichier) : `routes/v3/events.mjs`, `goods.mjs`, `links.mjs`, `polls.mjs`, `trips.mjs`, `tripStops.mjs`, `tripUsers.mjs`. Référence : `routes/v3/messages.mjs` (10 routes migrées).
+- Même idée pour la pagination des listes : `buildNextCursor(items, limit, fields)` (`utils/pagination.mjs`) remplace le bloc `items.length === limit ? buildCursor({...}) : null` — candidats : `events.mjs` (`['_id', 'startDate']`), `polls.mjs` (`['_id']`), `goods.mjs` (attention : `._id.toString()` appliqué avant sérialisation).
+
+## Reactions sur les messages (v3)
+
+- Modele : sous-docs `reactions: [{ emoji, users: [TripUserId] }]` dans `Message` — le count se deduit de `users.length`, pas de champ denormalise.
+- Whitelist stricte cote service (`ALLOWED_REACTIONS`, messageService) : thumbs up `\u{1F44D}`, thumbs down `\u{1F44E}`, red heart `\u{2764}\u{FE0F}` (**avec le variation selector FE0F — le front doit envoyer exactement cette string**), tears of joy `\u{1F602}`, crying `\u{1F622}`. Hors whitelist → 422.
+- Routes membre uniquement : `POST`/`DELETE /trips/:tripId/messages/:messageId/reactions`, body `{ emoji }` (DELETE accepte aussi `?emoji=` pour les clients qui droppent le body). Idempotents (`$addToSet`/`$pull`), reponse `{ reactions }` a jour. Message inconnu → 404.
+- Race premier react : deux updates (attach du sous-doc, puis `$addToSet`) avec repli si une requete concurrente a pose l'emoji entre les deux ; d'eventuels doublons d'entree `emoji` ne cassent rien mais ne sont pas dedoublonnes a la lecture.
+- La projection de `search` inclut `reactions` (piege des projections : pensez a l'ajouter aux futures projections).
 ## Suivis ouverts
 
+- Migrer les routes v3 restantes vers `loadTripContext` + `buildNextCursor` (voir sections dédiées) — opportuniste, au fil des PR.
 - Vérification manuelle en conditions réelles : transactions tripStops (créations concurrentes à 49 stops), batch hydrate.
 - Pas de test couvrant le curseur des messages contre une vraie query (service mocké).
 - UserAccount (comptes) : non prévu court terme ; si introduit, revoir `GET /`-like et `requireSeatOwnership`.

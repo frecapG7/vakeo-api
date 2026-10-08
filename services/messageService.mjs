@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import Message from "../models/messageModel.mjs";
 import Event from "../models/eventModel.mjs";
-import { InvalidError } from "../utils/errors.mjs";
+import { InvalidError, NotFoundError } from "../utils/errors.mjs";
 import { readCursor } from "../utils/pagination.mjs";
 
 export const createMessage = async (trip, { text = "", user, event = null }) => {
@@ -44,7 +44,7 @@ export const search = async (tripId, cursor, limit, eventId = null) => {
         limit = 100;
     }
 
-    const messages = await Message.find(query, 'text createdAt readBy', {
+    const messages = await Message.find(query, 'text createdAt readBy reactions', {
         limit,
         sort: {
             createdAt: -1,
@@ -65,6 +65,69 @@ export const deleteMessage = async (tripId, messageId, userId) => {
     return;
 }
 
+export const ALLOWED_REACTIONS = ["\u{1F44D}", "\u{1F44E}", "\u{2764}\u{FE0F}", "\u{1F602}", "\u{1F622}"];
+// thumbs up, thumbs down, heart, laughing with tears, crying
+
+const assertAllowedEmoji = (emoji) => {
+    if (!ALLOWED_REACTIONS.includes(emoji)) {
+        throw new InvalidError(`Emoji must be one of: ${ALLOWED_REACTIONS.join(" ")}`);
+    }
+};
+
+const getReactions = async (tripId, messageId) => {
+    const message = await Message.findOne({ _id: messageId, trip: tripId }, "reactions");
+    return message?.reactions ?? [];
+};
+
+export const addReaction = async (tripId, messageId, userId, emoji) => {
+    assertAllowedEmoji(emoji);
+    if (!(await Message.exists({ _id: messageId, trip: tripId })))
+        throw new NotFoundError(`Message ${messageId} not found`);
+
+    // Fast path: the emoji is already on the message — add the user atomically.
+    const existing = await Message.updateOne(
+        { _id: messageId, trip: tripId, "reactions.emoji": emoji },
+        { $addToSet: { "reactions.$.users": userId } }
+    );
+    if (existing.matchedCount === 0) {
+        // Emoji not yet on the message — attach a fresh reaction subdoc.
+        const created = await Message.updateOne(
+            { _id: messageId, trip: tripId, "reactions.emoji": { $ne: emoji } },
+            { $push: { reactions: { emoji, users: [userId] } } }
+        );
+        if (created.matchedCount === 0) {
+            // A concurrent request attached the same emoji between the two updates.
+            await Message.updateOne(
+                { _id: messageId, trip: tripId, "reactions.emoji": emoji },
+                { $addToSet: { "reactions.$.users": userId } }
+            );
+        }
+    }
+
+    return getReactions(tripId, messageId);
+};
+
+export const removeReaction = async (tripId, messageId, userId, emoji) => {
+    assertAllowedEmoji(emoji);
+    if (!(await Message.exists({ _id: messageId, trip: tripId })))
+        throw new NotFoundError(`Message ${messageId} not found`);
+
+    await Message.updateOne(
+        { _id: messageId, trip: tripId, "reactions.emoji": emoji },
+        { $pull: { "reactions.$.users": userId } }
+    );
+    // Drop the reaction entry once its last user is gone.
+    await Message.updateOne(
+        {
+            _id: messageId,
+            trip: tripId,
+            reactions: { $elemMatch: { emoji: emoji, users: { $size: 0 } } }
+        },
+        { $pull: { reactions: { emoji: emoji } } }
+    );
+
+    return getReactions(tripId, messageId);
+};
 export const markAllMessagesAsRead = async (tripId, userId, eventId = null, general = false) => {
     const filter = {
         trip: tripId,

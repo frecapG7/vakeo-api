@@ -1,4 +1,5 @@
 import { jest } from "@jest/globals";
+import { InvalidError, NotFoundError } from "../../utils/errors.mjs";
 
 // --- Mock all DB-dependent services ---
 const mockTripService = {
@@ -41,12 +42,23 @@ const mockTripUserService = {
     claimSeat: jest.fn(),
     releaseSeat: jest.fn(),
 };
+const mockMessageService = {
+    createMessage: jest.fn(),
+    deleteMessage: jest.fn(),
+    search: jest.fn(),
+    getHubConversations: jest.fn(),
+    getUnreadConversationCount: jest.fn(),
+    markAllMessagesAsRead: jest.fn(),
+    addReaction: jest.fn(),
+    removeReaction: jest.fn(),
+};
 
 jest.unstable_mockModule("../../services/tripService.mjs", () => mockTripService);
 jest.unstable_mockModule("../../services/tripStopService.mjs", () => mockTripStopService);
 jest.unstable_mockModule("../../services/goodsService.mjs", () => mockGoodsService);
 jest.unstable_mockModule("../../services/pollsService.mjs", () => mockPollsService);
 jest.unstable_mockModule("../../services/tripUserService.mjs", () => mockTripUserService);
+jest.unstable_mockModule("../../services/messageService.mjs", () => mockMessageService);
 
 const { encodeId } = await import("../../services/idEncoderService.mjs");
 
@@ -82,9 +94,12 @@ beforeAll(async () => {
     const goods = (await import("./goods.mjs")).default;
     const polls = (await import("./polls.mjs")).default;
 
+    const messages = (await import("./messages.mjs")).default;
+
     app.use(tripStops);
     app.use(goods);
     app.use(polls);
+    app.use(messages);
     app.use(handleError);
 
     server = app.listen(0);
@@ -267,5 +282,89 @@ describe("v3 polls", () => {
             body: JSON.stringify({ question: "When?", type: "DatesPoll", options: [] }),
         });
         expect(res.status).toBe(403);
+    });
+});
+
+// --- Messages: reactions ---
+describe("v3 message reactions", () => {
+    const encoded = encodeId("trip123");
+
+    test("member can react to a message (200, reactions returned)", async () => {
+        mockTripUserService.getTripUserByToken.mockResolvedValueOnce(memberUser);
+        mockTripService.getTrip.mockResolvedValueOnce(fakeTrip());
+        mockMessageService.addReaction.mockResolvedValueOnce([{ emoji: "\u{1F44D}", users: ["member1"] }]);
+
+        const res = await fetch(`${baseUrl}/trips/${encoded}/messages/msg1/reactions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-user-token": "tok-alice" },
+            body: JSON.stringify({ emoji: "\u{1F44D}" }),
+        });
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.reactions).toEqual([{ emoji: "\u{1F44D}", users: ["member1"] }]);
+        expect(mockMessageService.addReaction).toHaveBeenCalledWith("trip123", "msg1", "member1", "\u{1F44D}");
+    });
+
+    test("anonymous gets 401 on reactions", async () => {
+        const res = await fetch(`${baseUrl}/trips/${encoded}/messages/msg1/reactions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ emoji: "\u{1F44D}" }),
+        });
+        expect(res.status).toBe(401);
+    });
+
+    test("non-member gets 403 on reactions", async () => {
+        mockTripUserService.getTripUserByToken.mockResolvedValueOnce(strangerUser);
+        mockTripService.getTrip.mockResolvedValueOnce(fakeTrip());
+
+        const res = await fetch(`${baseUrl}/trips/${encoded}/messages/msg1/reactions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-user-token": "tok-stranger" },
+            body: JSON.stringify({ emoji: "\u{1F44D}" }),
+        });
+        expect(res.status).toBe(403);
+    });
+
+    test("disallowed emoji surfaces 422", async () => {
+        mockTripUserService.getTripUserByToken.mockResolvedValueOnce(memberUser);
+        mockTripService.getTrip.mockResolvedValueOnce(fakeTrip());
+        mockMessageService.addReaction.mockRejectedValueOnce(new InvalidError("Emoji must be one of the allowed reactions"));
+
+        const res = await fetch(`${baseUrl}/trips/${encoded}/messages/msg1/reactions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-user-token": "tok-alice" },
+            body: JSON.stringify({ emoji: "\u{1F419}" }),
+        });
+        expect(res.status).toBe(422);
+    });
+
+    test("unknown message surfaces 404", async () => {
+        mockTripUserService.getTripUserByToken.mockResolvedValueOnce(memberUser);
+        mockTripService.getTrip.mockResolvedValueOnce(fakeTrip());
+        mockMessageService.addReaction.mockRejectedValueOnce(new NotFoundError("Message msgX not found"));
+
+        const res = await fetch(`${baseUrl}/trips/${encoded}/messages/msgX/reactions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-user-token": "tok-alice" },
+            body: JSON.stringify({ emoji: "\u{1F44D}" }),
+        });
+        expect(res.status).toBe(404);
+    });
+
+    test("member can remove a reaction (200)", async () => {
+        mockTripUserService.getTripUserByToken.mockResolvedValueOnce(memberUser);
+        mockTripService.getTrip.mockResolvedValueOnce(fakeTrip());
+        mockMessageService.removeReaction.mockResolvedValueOnce([]);
+
+        const res = await fetch(`${baseUrl}/trips/${encoded}/messages/msg1/reactions`, {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json", "x-user-token": "tok-alice" },
+            body: JSON.stringify({ emoji: "\u{1F44D}" }),
+        });
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.reactions).toEqual([]);
+        expect(mockMessageService.removeReaction).toHaveBeenCalledWith("trip123", "msg1", "member1", "\u{1F44D}");
     });
 });
