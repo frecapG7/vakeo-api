@@ -6,7 +6,7 @@ jest.unstable_mockModule("link-preview-js", () => ({ getLinkPreview: mockGetLink
 const mockLookup = jest.fn();
 jest.unstable_mockModule("node:dns", () => ({ default: { lookup: mockLookup } }));
 
-const { getPreview, isPrivateAddress } = await import("./linkPreviewService.mjs");
+const { getPreview, isPrivateAddress, isSameSiteRedirect } = await import("./linkPreviewService.mjs");
 const { InvalidError, ForbiddenError } = await import("../utils/errors.mjs");
 
 const publicLookup = (hostname, cb) => cb(null, "93.184.216.34", 4);
@@ -49,6 +49,31 @@ describe("isPrivateAddress — SSRF ranges", () => {
     });
 });
 
+describe("isSameSiteRedirect — redirect policy", () => {
+    test("allows https redirects to the same host", () => {
+        expect(isSameSiteRedirect("https://booking.com/x", "https://booking.com/y")).toBe(true);
+    });
+
+    test("allows https www variants in both directions", () => {
+        expect(isSameSiteRedirect("https://booking.com/x", "https://www.booking.com/y")).toBe(true);
+        expect(isSameSiteRedirect("https://www.booking.com/x", "https://booking.com/y")).toBe(true);
+    });
+
+    test("allows https redirects to subdomains of the base host (fr.booking.com, secure.booking.com)", () => {
+        expect(isSameSiteRedirect("https://booking.com/x", "https://fr.booking.com/y")).toBe(true);
+        expect(isSameSiteRedirect("https://www.booking.com/x", "https://secure.booking.com/y")).toBe(true);
+    });
+
+    test("rejects https to http downgrades, even on the same host", () => {
+        expect(isSameSiteRedirect("https://booking.com/x", "http://booking.com/y")).toBe(false);
+        expect(isSameSiteRedirect("https://booking.com/x", "http://www.booking.com/y")).toBe(false);
+    });
+
+    test("rejects https redirects to other domains", () => {
+        expect(isSameSiteRedirect("https://booking.com/x", "https://evil-booking.com/y")).toBe(false);
+        expect(isSameSiteRedirect("https://booking.com/x", "https://attacker.com/y")).toBe(false);
+    });
+});
 describe("getPreview", () => {
     test("returns the preview on the first attempt", async () => {
         mockGetLinkPreview.mockResolvedValueOnce(fullPreview());

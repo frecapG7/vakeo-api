@@ -143,13 +143,18 @@ const validateUrl = (rawUrl) => {
  * subdomains (booking.com bounces across fr.booking.com, secure.booking.com,
  * www.booking.com). Redirect targets are still DNS-guarded via resolveDNSHost.
  */
-const isSameSiteRedirect = (baseURL, forwardedURL) => {
+export const isSameSiteRedirect = (baseURL, forwardedURL) => {
+    const forwardedUrl = new URL(forwardedURL);
+    // No https → http downgrade on manually followed redirects
+    if (forwardedUrl.protocol !== "https:")
+        return false;
     const base = new URL(baseURL).hostname.toLowerCase();
-    const forwarded = new URL(forwardedURL).hostname.toLowerCase();
+    const forwarded = forwardedUrl.hostname.toLowerCase();
+    const root = base.replace(/^www\./, "");
     return forwarded === base
-        || forwarded === `www.${base}`
+        || forwarded === `www.${root}`
         || `www.${forwarded}` === base
-        || forwarded.endsWith(`.${base}`);
+        || forwarded.endsWith(`.${root}`);
 };
 
 const attemptPreview = async (url, headers) => {

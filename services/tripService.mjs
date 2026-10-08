@@ -112,7 +112,9 @@ export const getOrCreateEncodedId = async (trip) => {
     { $set: { encodedId: encoded } }
   );
   const updated = await Trip.findById(trip._id, "encodedId");
-  return updated?.encodedId ?? encoded;
+  if (!updated)
+    throw new NotFoundError(`Cannot find trip with id ${trip._id}`);
+  return updated.encodedId ?? encoded;
 };
 export const getTrip = async (id, includeStops = false) => {
   const trip = await Trip.findById(id);

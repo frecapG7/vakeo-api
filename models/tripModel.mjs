@@ -71,10 +71,9 @@ const tripSchema = new mongoose.Schema({
 
 // Mint the public encodedId once, at creation — it must be stable for the
 // lifetime of the trip so clients keying on it never see duplicates.
-tripSchema.pre("save", function (next) {
+tripSchema.pre("save", function () {
     if (!this.encodedId)
         this.encodedId = encodeId(this._id.toString());
-    next();
 });
 
 

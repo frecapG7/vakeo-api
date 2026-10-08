@@ -85,8 +85,7 @@ Notes de contexte pour travailler sur l'API v3. Fichier maintenu à la main — 
 ## Suivis ouverts
 
 - Migrer les routes v3 restantes vers `loadTripContext` + `buildNextCursor` (voir sections dédiées) — opportuniste, au fil des PR.
-- Lancer 
-ode scripts/backfillEncodedIds.mjs en prod apres le deploy (les appels migrate/tokens auto-guerissent le reste opportunistement).
+- Lancer `node scripts/backfillEncodedIds.mjs` en prod apres le deploy (les appels migrate/tokens auto-guerissent le reste opportunistement).
 - Vérification manuelle en conditions réelles : transactions tripStops (créations concurrentes à 49 stops), batch hydrate.
 - Pas de test couvrant le curseur des messages contre une vraie query (service mocké).
 - UserAccount (comptes) : non prévu court terme ; si introduit, revoir `GET /`-like et `requireSeatOwnership`.
