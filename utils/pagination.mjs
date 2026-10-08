@@ -24,6 +24,12 @@ export const buildCursor = (cursorData) => {
     return Buffer.from(JSON.stringify(cursorData)).toString('base64');
 };
 
+export const buildNextCursor = (items, limit, fields = ['_id']) => {
+    if (!items || items.length !== limit) return null;
+    const last = items[items.length - 1];
+    return buildCursor(Object.fromEntries(fields.map(field => [field, last?.[field]])));
+};
+
 export const readCursor = (cursor) => {
     if (!cursor) return null;
     try {

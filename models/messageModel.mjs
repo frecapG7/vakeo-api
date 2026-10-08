@@ -32,6 +32,16 @@ const modelSchema = new mongoose.Schema({
             type: Date,
             default: Date.now
         }
+    }],
+    reactions: [{
+        emoji: {
+            type: String,
+            required: true
+        },
+        users: [{
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "TripUser"
+        }]
     }]
 }, {
     timestamps: true
