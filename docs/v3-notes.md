@@ -74,13 +74,18 @@ Notes de contexte pour travailler sur l'API v3. Fichier maintenu à la main — 
 - Routes membre uniquement : `POST`/`DELETE /trips/:tripId/messages/:messageId/reactions`, body `{ emoji }` (DELETE accepte aussi `?emoji=` pour les clients qui droppent le body). Idempotents (`$addToSet`/`$pull`), reponse `{ reactions }` a jour. Message inconnu → 404.
 - Race premier react : deux updates (attach du sous-doc, puis `$addToSet`) avec repli si une requete concurrente a pose l'emoji entre les deux ; d'eventuels doublons d'entree `emoji` ne cassent rien mais ne sont pas dedoublonnes a la lecture.
 - La projection de `search` inclut `reactions` (piege des projections : pensez a l'ajouter aux futures projections).
+## Secrets Bruno (collections API)
+
+- Les fichiers `bruno/environments/*.bru` ne contiennent **jamais** de valeurs de credentials : `apiKey` et `seatToken` sont declares dans `vars:secret` — valeurs stockees uniquement dans le store local chiffre de Bruno (OS-level), jamais ecrites dans le fichier ni exportees. Chaque dev / env re-saisit ses valeurs dans l''app une fois.
+- Ne jamais committer de token ou cle API dans un `.bru` — l''historique git les rend grillables (rotation obligatoire sinon).
 ## Link preview v3 (POST /v3/link-preview)
 
 - Remplace le endpoint v1 (`routes/link-preview.mjs`, conserve en legacy). Logique dans `services/linkPreviewService.mjs`, route = delegation. Pas de trip scope : ouvert derriere la cle API + rate limit dedie **20 req/min/IP** (le global 1000/15min est trop leger pour un scraper).
 - **SSRF** : `resolvePublicAddress` (dns.lookup + `isPrivateAddress`) rejette loopback, privees 10/172.16/192.168, CGNAT 100.64/10, link-local 169.254/16 (metadata cloud), multicast, et leurs equivalents IPv6. Passe aussi a la lib via `resolveDNSHost` → chaque redirect revalide. 403 `ForbiddenError` si vise ; 422 si URL mal formee ou host non resolvable (v1 renvoyait 500, corrige).
 - **Anti-bot (booking.com & co)** : 2 profils navigateur reels (Chrome complet avec sec-fetch headers, puis Safari) — essai 1, si le titre matche les `DENIED_KEYWORDS` (murs Cloudflare, "Just a moment", captcha...) on retente avec le profil 2. Si tout est rebute : **carte fallback** `{ title: domaine, fallback: true }` — le front rend toujours quelque chose. Timeout 10s par essai (v1 : 30s).
-- Redirections : `manual` + `isSameSiteRedirect` — meme hote, variantes www, et sous-domaines de l'hote d'origine (booking bascule fr.booking.com / secure.booking.com), cible revalidee par le garde DNS a chaque hop.
+- Redirections : `manual` + `isSameSiteRedirect` — https **uniquement** (pas de downgrade http), meme hote, variantes www, et sous-domaines de la racine du site (booking bascule fr.booking.com / secure.booking.com ; le www initial est retire pour le check de suffixe), cible revalidee par le garde DNS a chaque hop. Testee unitairement (`isSameSiteRedirect` exportee).
 - Tests : `services/linkPreviewService.test.mjs` (17 cas `isPrivateAddress` dont IPv6 mapped, retry profil 2 simule booking, fallback, 422/403) + `routes/v3/linkPreview.test.mjs` (200/422/403). Le comportement REEL contre booking.com est hors portee des unites (lib mockee) — a verifier en integration manuelle.
+- **Deps** : `link-preview-js` pinné `^4.0.4` minimum (fix securite lib) — l''interface (`resolveDNSHost`, `handleRedirects`...) est inchangee, verifier le .d.ts si future upgrade majeure.
 - Si le taux de fallback reste eleve : prochaines etapes possibles = fetch maison + `getPreviewFromContent` (la lib v4 permet de parser du HTML pre-fetche, ex. via un proxy residentiel) ou un renderer headless type puppeteer — plus lourd.
 ## Suivis ouverts
 
