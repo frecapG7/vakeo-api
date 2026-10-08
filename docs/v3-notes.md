@@ -59,6 +59,14 @@ Notes de contexte pour travailler sur l'API v3. Fichier maintenu à la main — 
 - Migrations opportunistes restantes (prélude manuel `resolveEncodedTripId` + `getTrip` + garde, à remplacer au passage quand on touche le fichier) : `routes/v3/events.mjs`, `goods.mjs`, `links.mjs`, `polls.mjs`, `trips.mjs`, `tripStops.mjs`, `tripUsers.mjs`. Référence : `routes/v3/messages.mjs` (10 routes migrées).
 - Même idée pour la pagination des listes : `buildNextCursor(items, limit, fields)` (`utils/pagination.mjs`) remplace le bloc `items.length === limit ? buildCursor({...}) : null` — candidats : `events.mjs` (`['_id', 'startDate']`), `polls.mjs` (`['_id']`), `goods.mjs` (attention : `._id.toString()` appliqué avant sérialisation).
 
+## encodedId persiste sur Trip (fix duplications)
+
+- **Probleme** : `encodeId` (AES-256-GCM, IV aleatoire) n'etait pas idempotent — deux mints du meme trip donnaient deux strings valides mais distinctes. Le front memorisant des couples (encodedId, token), un meme trip partage/joint plusieurs fois creeait des entrees dupliquees.
+- **Decision (option A, persiste)** : champ `Trip.encodedId` (String, unique, **sparse** — obligatoire pour que les trips legacy sans le champ ne violent pas l'index unique). Minte une seule fois par hook `pre("save")` dans tripModel, jamais regenere.
+- Contrat : **tous les points qui servent un encodedId lisent le champ persiste** — POST /trips (creation), GET /trips/:tripId (inclus via toObject), resolution des join tokens (`tokens.mjs`), `migrate.mjs`. `batchHydrate` continue d'echoyer l'id envoye par le client. **Jamais de `encodeId(trip._id)` en route** : c'est le bug.
+- Trips legacy sans champ : `tripService.getOrCreateEncodedId(trip)` mint + persiste paresseusement a la volee (update atomique `$exists`-garde, first-write-wins, les perdants relisent le gagnant). `migrate.mjs` est donc le vecteur de migration naturel : chaque appel cutover persiste l'id du trip migre.
+- Backfill one-shot : `node scripts/backfillEncodedIds.mjs` (meme garde `$exists`, sur a lancer pendant que l'API tourne ; exit 1 s'il reste des trips sans champ).
+- Les ancres : le resolve reste `decodeId` (chiffrement aleatoire conserve — la stabilite vient de la persistance, pas du determinisme). Une rotation de `OBFUSCATION_KEY` casserait toujours les ids stockes cote front, mais le champ en base permettrait un jour de resoudre par lookup DB.
 ## Reactions sur les messages (v3)
 
 - Modele : sous-docs `reactions: [{ emoji, users: [TripUserId] }]` dans `Message` — le count se deduit de `users.length`, pas de champ denormalise.
@@ -66,9 +74,18 @@ Notes de contexte pour travailler sur l'API v3. Fichier maintenu à la main — 
 - Routes membre uniquement : `POST`/`DELETE /trips/:tripId/messages/:messageId/reactions`, body `{ emoji }` (DELETE accepte aussi `?emoji=` pour les clients qui droppent le body). Idempotents (`$addToSet`/`$pull`), reponse `{ reactions }` a jour. Message inconnu → 404.
 - Race premier react : deux updates (attach du sous-doc, puis `$addToSet`) avec repli si une requete concurrente a pose l'emoji entre les deux ; d'eventuels doublons d'entree `emoji` ne cassent rien mais ne sont pas dedoublonnes a la lecture.
 - La projection de `search` inclut `reactions` (piege des projections : pensez a l'ajouter aux futures projections).
+## Link preview v3 (POST /v3/link-preview)
+
+- Remplace le endpoint v1 (`routes/link-preview.mjs`, conserve en legacy). Logique dans `services/linkPreviewService.mjs`, route = delegation. Pas de trip scope : ouvert derriere la cle API + rate limit dedie **20 req/min/IP** (le global 1000/15min est trop leger pour un scraper).
+- **SSRF** : `resolvePublicAddress` (dns.lookup + `isPrivateAddress`) rejette loopback, privees 10/172.16/192.168, CGNAT 100.64/10, link-local 169.254/16 (metadata cloud), multicast, et leurs equivalents IPv6. Passe aussi a la lib via `resolveDNSHost` → chaque redirect revalide. 403 `ForbiddenError` si vise ; 422 si URL mal formee ou host non resolvable (v1 renvoyait 500, corrige).
+- **Anti-bot (booking.com & co)** : 2 profils navigateur reels (Chrome complet avec sec-fetch headers, puis Safari) — essai 1, si le titre matche les `DENIED_KEYWORDS` (murs Cloudflare, "Just a moment", captcha...) on retente avec le profil 2. Si tout est rebute : **carte fallback** `{ title: domaine, fallback: true }` — le front rend toujours quelque chose. Timeout 10s par essai (v1 : 30s).
+- Redirections : `manual` + `isSameSiteRedirect` — meme hote, variantes www, et sous-domaines de l'hote d'origine (booking bascule fr.booking.com / secure.booking.com), cible revalidee par le garde DNS a chaque hop.
+- Tests : `services/linkPreviewService.test.mjs` (17 cas `isPrivateAddress` dont IPv6 mapped, retry profil 2 simule booking, fallback, 422/403) + `routes/v3/linkPreview.test.mjs` (200/422/403). Le comportement REEL contre booking.com est hors portee des unites (lib mockee) — a verifier en integration manuelle.
+- Si le taux de fallback reste eleve : prochaines etapes possibles = fetch maison + `getPreviewFromContent` (la lib v4 permet de parser du HTML pre-fetche, ex. via un proxy residentiel) ou un renderer headless type puppeteer — plus lourd.
 ## Suivis ouverts
 
 - Migrer les routes v3 restantes vers `loadTripContext` + `buildNextCursor` (voir sections dédiées) — opportuniste, au fil des PR.
+- Lancer `node scripts/backfillEncodedIds.mjs` en prod apres le deploy (les appels migrate/tokens auto-guerissent le reste opportunistement).
 - Vérification manuelle en conditions réelles : transactions tripStops (créations concurrentes à 49 stops), batch hydrate.
 - Pas de test couvrant le curseur des messages contre une vraie query (service mocké).
 - UserAccount (comptes) : non prévu court terme ; si introduit, revoir `GET /`-like et `requireSeatOwnership`.

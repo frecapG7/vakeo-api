@@ -1,4 +1,5 @@
 name: Create Release
+
 on:
   workflow_dispatch:
     inputs:
@@ -12,7 +13,8 @@ on:
           - major
 
 jobs:
-  release:
+  test:
+    name: Test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -23,15 +25,45 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        env:
+          # dotenv loads .env locally, but .env is gitignored — on CI the
+          # required secret is provided inline (only its length matters,
+          # >= 32 chars, validated fail-fast by config.mjs).
+          TOKEN_SECRET: ci-only-token-secret-0123456789abcdef
+        run: node --experimental-vm-modules node_modules/jest/bin/jest.js --ci
+
+  release:
+    name: Bump version and publish image
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
 
       - name: Configure Git
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
 
+      # [skip ci] keeps the version-bump commit from re-triggering the
+      # main-branch build workflow — this job already publishes :latest
       - name: Bump version
-        run: npm version ${{ inputs.release_type }}
+        run: npm version ${{ inputs.release_type }} -m "release v%s [skip ci]"
 
       - name: Get new version
         id: version
@@ -52,11 +84,14 @@ jobs:
           password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Build and push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
+          context: .
+          file: DockerFile
           push: true
           tags: |
             ghcr.io/frecapg7/vakeo-api:latest
             ghcr.io/frecapg7/vakeo-api:v${{ steps.version.outputs.version }}
             ghcr.io/frecapg7/vakeo-api:${{ github.sha }}
-          file: DockerFile
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

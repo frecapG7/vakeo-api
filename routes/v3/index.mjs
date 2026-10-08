@@ -9,6 +9,7 @@ import messages from "./messages.mjs";
 import tripUsers from "./tripUsers.mjs";
 import events from "./events.mjs";
 import migrate from "./migrate.mjs";
+import linkPreview from "./linkPreview.mjs";
 
 const app = express();
 
@@ -29,5 +30,6 @@ app.use(messages);
 app.use(tripUsers);
 app.use(events);
 app.use("/migrate", migrate);
+app.use(linkPreview);
 
 export default app;

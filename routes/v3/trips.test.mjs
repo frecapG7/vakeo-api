@@ -84,6 +84,7 @@ const fakeTrip = (overrides = {}) => ({
     name: "Summer",
     users: ["member1", "member2"],
     isPrivate: false,
+    encodedId: "enc-trip123-stable",
     toObject() { return { ...this, ...overrides }; },
     populate: async function () { return this; },
     ...overrides,

@@ -9,7 +9,7 @@ import {
 } from "../../services/tripService.mjs";
 import { createTripUsers, claimSeat, releaseSeat, addSeatsToTrip } from "../../services/tripUserService.mjs";
 import { generateJoinToken, verifyJoinToken } from "../../services/joinTokenService.mjs";
-import { encodeId, resolveEncodedTripId } from "../../services/idEncoderService.mjs";
+import { resolveEncodedTripId } from "../../services/idEncoderService.mjs";
 import { requireMembership, requireReadAccess } from "../../services/validationService.mjs";
 import { auth, optionalAuth } from "./auth.mjs";
 import { InvalidError, ForbiddenError } from "../../utils/errors.mjs";
@@ -59,7 +59,7 @@ app.post("/", async (req, res) => {
 
     return res.status(201).json({
         ...trip.toObject(),
-        encodedId: encodeId(trip._id.toString()),
+        encodedId: trip.encodedId,
         seats,
         credentials: claimed
             ? { _id: claimed._id, name: claimed.name, token: claimed.token }

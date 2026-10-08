@@ -1,25 +1,20 @@
-FROM node:22-alpine as build
-WORKDIR /build
-
-# Copy package files
-COPY package*.json ./
-
-# Install the dependencies
-RUN npm install
-
-# Copy the rest of the application code
-COPY . .
-
-# If link-preview-js needs building, this will trigger postinstall scripts
-RUN npm rebuild && npm cache clean --force
-
-# Production stage
 FROM node:22-alpine
 WORKDIR /app
+ENV NODE_ENV=production
 
-# Copy package files and install production dependencies only
-COPY --from=build /build ./
+# Dependencies layer — cached unless package*.json changes.
+# npm ci installs exactly the lockfile; --omit=dev keeps the image lean.
+COPY package*.json ./
+RUN npm ci --omit=dev && npm cache clean --force
 
-# The production node_modules are already in place from step 2
+# Application code
+COPY . .
+
+# Rebuild native modules against this stage if any dependency needs it (no-op otherwise)
+RUN npm rebuild
+
+# Never run as root — node:22-alpine ships an unprivileged `node` user
+USER node
+
 EXPOSE 3000
 CMD ["node", "index.mjs"]

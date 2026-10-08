@@ -1,7 +1,6 @@
 import express from "express";
-import { getTrip } from "../../services/tripService.mjs";
+import { getTrip, getOrCreateEncodedId } from "../../services/tripService.mjs";
 import { getTripUserWithToken, claimSeat } from "../../services/tripUserService.mjs";
-import { encodeId } from "../../services/idEncoderService.mjs";
 import { InvalidError, ForbiddenError, NotFoundError } from "../../utils/errors.mjs";
 import mongoose from "mongoose";
 
@@ -30,9 +29,10 @@ app.post("/", async (req, res) => {
         throw new InvalidError("Invalid tripId format");
 
     const trip = await getTrip(tripId);
+    const encodedId = await getOrCreateEncodedId(trip);
 
     if (!legacyUserId)
-        return res.status(200).json({ encodedId: encodeId(trip._id.toString()) });
+        return res.status(200).json({ encodedId });
 
     if (!mongoose.Types.ObjectId.isValid(legacyUserId))
         throw new InvalidError("Invalid x-user-id format");
@@ -44,7 +44,7 @@ app.post("/", async (req, res) => {
     const claimed = await claimSeat(legacyUserId);
     if (claimed)
         return res.status(200).json({
-            encodedId: encodeId(trip._id.toString()),
+            encodedId: encodedId,
             user: { _id: claimed._id, name: claimed.name },
             token: claimed.token,
         });
@@ -55,7 +55,7 @@ app.post("/", async (req, res) => {
         throw new NotFoundError("TripUser not found");
 
     return res.status(200).json({
-        encodedId: encodeId(trip._id.toString()),
+        encodedId: encodedId,
         user: { _id: tripUser._id, name: tripUser.name },
         token: tripUser.token,
     });

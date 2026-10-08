@@ -1,0 +1,62 @@
+meta {
+  name: Batch Hydrate
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/v3/trips/batch
+  body: json
+  auth: none
+}
+
+headers {
+  x-api-key: {{apiKey}}
+}
+
+body:json {
+  {
+    "trips": [
+      {
+        "id": "{{encodedTripId}}",
+        "token": "{{seatToken}}"
+      }
+    ]
+  }
+}
+
+docs {
+  # POST /v3/trips/batch — hydratation par lot
+
+  Lancer **Migrate** (seq 1) d'abord : il remplit encodedTripId / seatToken.
+
+  Contrat a verifier :
+  - chaque trip renvoye porte un encodedId qui **echo l'id envoye** — jamais un
+    re-encodage (encodeId utilise un IV aleatoire, un re-encodage donnerait une
+    chaine differente) ;
+  - trips invisibles (introuvable, ou prive sans token de seat valide) : omis
+    silencieusement ;
+  - id malformes ou dupliques : 422 sur tout le batch.
+
+  Pour tester plusieurs trips : dupliquer une entree dans le tableau trips
+  (1-30 entrees, ids uniques).
+}
+
+tests {
+  const body = res.getBody();
+  const sentId = bru.getEnvVar('encodedTripId');
+
+  test('status 200', () => {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test('renvoie un tableau trips', () => {
+    expect(body.trips).to.be.an('array');
+  });
+
+  test('encodedId = echo exact de l id envoye', () => {
+    const trip = body.trips.find((t) => t.encodedId === sentId);
+    expect(trip, 'trip omis : introuvable, ou prive sans seat token valide').to.not.be.undefined;
+    expect(trip.encodedId).to.equal(sentId);
+  });
+}
