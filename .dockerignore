@@ -31,6 +31,12 @@ coverage
 Dockerfile
 .dockerignore
 
+# Ignore repo meta and test artifacts not needed at runtime
+.github
+archived_docs
+bruno
+AGENTS.md
+*.test.mjs
 # Ignore OS-specific files
 .DS_Store
 Thumbs.db

@@ -1,7 +1,6 @@
 import express from "express";
-import { getTrip } from "../../services/tripService.mjs";
+import { getTrip, getOrCreateEncodedId } from "../../services/tripService.mjs";
 import { verifyJoinTokenAnyTrip } from "../../services/joinTokenService.mjs";
-import { encodeId } from "../../services/idEncoderService.mjs";
 import TripUser from "../../models/tripUserModel.mjs";
 import { InvalidError } from "../../utils/errors.mjs";
 
@@ -31,7 +30,7 @@ app.get("/:value", async (req, res) => {
 
     return res.status(200).json({
         type: "joinToken",
-        encodedId: encodeId(trip._id.toString()),
+        encodedId: await getOrCreateEncodedId(trip),
         trip: {
             _id: trip._id,
             name: trip.name,

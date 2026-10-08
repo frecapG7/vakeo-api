@@ -1,0 +1,54 @@
+meta {
+  name: Migrate (raw id -> encodedId)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/v3/migrate
+  body: json
+  auth: none
+}
+
+headers {
+  x-api-key: {{apiKey}}
+  x-user-id: {{legacyUserId}}
+}
+
+body:json {
+  {
+    "tripId": "{{tripId}}"
+  }
+}
+
+docs {
+  # POST /v3/migrate — pont v1 -> v3
+
+  Envoie le `_id` Mongo brut du trip (variable d'env `tripId`) et recupere l'encodedId.
+
+  - legacyUserId vide : trip public — renvoie juste `{ encodedId }`.
+  - legacyUserId rempli (ObjectId d'un TripUser membre) : claim/mint atomique du seat,
+    renvoie `{ encodedId, user, token }`.
+
+  La reponse alimente les variables d'env `encodedTripId` et `seatToken`
+  consommees par la requete Batch Hydrate (seq 2).
+
+  Header x-user-id vide = absent cote Express (falsy), donc pas besoin de le retirer
+  pour les trips publics.
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (res.getStatus() === 200 && body && body.encodedId) {
+    bru.setEnvVar('encodedTripId', body.encodedId);
+    bru.setEnvVar('seatToken', body.token || '');
+  }
+}
+
+tests {
+  test('renvoie un encodedId', () => {
+    const body = res.getBody();
+    expect(res.getStatus()).to.equal(200);
+    expect(body.encodedId, 'verifier tripId / x-api-key').to.be.a('string').and.not.empty;
+  });
+}

@@ -6,7 +6,7 @@ import Link from "../models/linkModel.mjs";
 import { Poll } from "../models/pollModel.mjs";
 import { InvalidError, NotFoundError } from "../utils/errors.mjs";
 import { sanitizeSearchText } from "../utils/pagination.mjs";
-import { resolveEncodedTripId } from "./idEncoderService.mjs";
+import { encodeId, resolveEncodedTripId } from "./idEncoderService.mjs";
 import { getTripUsersByTokens } from "./tripUserService.mjs";
 import { verifyDates } from "./validationService.mjs";
 import TripUser from "../models/tripUserModel.mjs";
@@ -94,6 +94,26 @@ export const batchHydrate = async (entries) => {
     .map(([rawId, { encoded }]) => ({ ...byId.get(rawId).toObject(), encodedId: encoded }));
 }
 
+/**
+ * Returns the trip's persisted encodedId, minting and persisting it lazily
+ * for trips created before the field existed. First write wins: concurrent
+ * callers may compute different strings, but the $exists-guarded $set is
+ * atomic — losers re-read the persisted winner.
+ * @param {object} trip - trip document (or trip-like object)
+ * @returns {Promise<string>} the stable encodedId
+ */
+export const getOrCreateEncodedId = async (trip) => {
+  if (trip.encodedId)
+    return trip.encodedId;
+
+  const encoded = encodeId(trip._id.toString());
+  await Trip.updateOne(
+    { _id: trip._id, encodedId: { $exists: false } },
+    { $set: { encodedId: encoded } }
+  );
+  const updated = await Trip.findById(trip._id, "encodedId");
+  return updated?.encodedId ?? encoded;
+};
 export const getTrip = async (id, includeStops = false) => {
   const trip = await Trip.findById(id);
   if (!trip)

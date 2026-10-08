@@ -3,6 +3,7 @@ import { jest } from "@jest/globals";
 // --- Mock the DB-dependent services ---
 const mockTripService = {
     getTrip: jest.fn(),
+    getOrCreateEncodedId: jest.fn(),
 };
 
 const mockTripUserService = {
@@ -15,6 +16,7 @@ jest.unstable_mockModule("../../services/tripUserService.mjs", () => mockTripUse
 
 // --- Build the test app ---
 const { encodeId, decodeId } = await import("../../services/idEncoderService.mjs");
+const TRIP_ENCODED = encodeId("507f1f77bcf86cd799439011");
 
 let app, server, baseUrl;
 
@@ -45,7 +47,12 @@ const fakeTrip = (overrides = {}) => ({
     name: "Summer",
     users: [USER_ID],
     isPrivate: false,
+    encodedId: TRIP_ENCODED,
     ...overrides,
+});
+
+beforeEach(() => {
+    mockTripService.getOrCreateEncodedId.mockResolvedValue(TRIP_ENCODED);
 });
 
 
