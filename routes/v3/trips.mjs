@@ -7,7 +7,7 @@ import {
     dashboard,
     batchHydrate,
 } from "../../services/tripService.mjs";
-import { createTripUsers, claimSeat, releaseSeat, addSeatsToTrip, switchSeat } from "../../services/tripUserService.mjs";
+import { createTripUsers, claimSeat, releaseSeat, addSeatsToTrip, switchSeat, getClaimedSeatIds } from "../../services/tripUserService.mjs";
 import { generateJoinToken, verifyJoinToken } from "../../services/joinTokenService.mjs";
 import { resolveEncodedTripId } from "../../services/idEncoderService.mjs";
 import { requireMembership, requireReadAccess } from "../../services/validationService.mjs";
@@ -15,6 +15,17 @@ import { auth, optionalAuth } from "./auth.mjs";
 import { InvalidError, ForbiddenError } from "../../utils/errors.mjs";
 
 const app = express();
+
+/**
+ * Decorate a trip's hydrated users with a `claimed` boolean (seat occupancy).
+ * The tokens themselves are never selected — only their presence is queried.
+ * @param {object[]} users - hydrated TripUser documents (plain objects)
+ * @returns {Promise<object[]>} the users with `claimed` added
+ */
+const withClaimedSeats = async (users) => {
+    const claimedIds = await getClaimedSeatIds(users.map((u) => u._id));
+    return users.map((u) => ({ ...u, claimed: claimedIds.has(String(u._id)) }));
+};
 
 /**
  * POST /batch — hydrate several trips at once, each entry with its own credential.
@@ -71,7 +82,7 @@ app.post("/", async (req, res) => {
  * GET /:tripId — get a single trip.
  * Public trip: anyone can read. Private trip: authenticated member only.
  * @param {string} tripId - encoded trip id
- * @returns {object} - trip with populated users
+ * @returns {object} - trip with populated users, each with a `claimed` boolean
  */
 app.get("/:tripId", optionalAuth, async (req, res) => {
     const rawId = resolveEncodedTripId(req.params.tripId);
@@ -79,14 +90,16 @@ app.get("/:tripId", optionalAuth, async (req, res) => {
     const trip = await getTrip(rawId, includeStops);
     requireReadAccess(trip, req.user);
     await trip.populate("users");
-    return res.status(200).json(trip);
+    const payload = trip.toObject();
+    payload.users = await withClaimedSeats(payload.users);
+    return res.status(200).json(payload);
 });
 
 /**
  * PUT /:tripId — update a trip (auth + membership required).
  * @param {string} tripId - encoded trip id
  * @body {object} - fields to update
- * @returns {object} - updated trip with populated users
+ * @returns {object} - updated trip with populated users, each with a `claimed` boolean
  */
 app.put("/:tripId", auth, async (req, res) => {
     const rawId = resolveEncodedTripId(req.params.tripId);
@@ -94,7 +107,9 @@ app.put("/:tripId", auth, async (req, res) => {
     requireMembership(trip, req.user);
     const savedTrip = await updateTrip(trip, req.body);
     await savedTrip.populate("users");
-    return res.status(200).json(savedTrip);
+    const payload = savedTrip.toObject();
+    payload.users = await withClaimedSeats(payload.users);
+    return res.status(200).json(payload);
 });
 
 /**

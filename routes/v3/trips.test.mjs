@@ -12,6 +12,7 @@ const mockTripUserService = {
     claimSeat: jest.fn(),
     releaseSeat: jest.fn(),
     switchSeat: jest.fn(),
+    getClaimedSeatIds: jest.fn(async (ids = []) => new Set(ids.map(String))),
 };
 
 const mockTripService = {
@@ -259,6 +260,66 @@ describe("DELETE /trips/:tripId (auth + membership)", () => {
     });
 });
 
+
+describe("GET /trips/:tripId (seat occupancy)", () => {
+
+    test("users carry claimed=true only for taken seats", async () => {
+        const encoded = encodeId("trip123");
+        mockTripService.getTrip.mockResolvedValueOnce(
+            fakeTrip({ users: [{ _id: "member1", name: "Alice" }, { _id: "member2", name: "Bob" }] })
+        );
+        mockTripUserService.getClaimedSeatIds.mockResolvedValueOnce(new Set(["member1"]));
+
+        const res = await fetch(`${baseUrl}/trips/${encoded}`);
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.users).toHaveLength(2);
+        expect(body.users.find((u) => u.name === "Alice").claimed).toBe(true);
+        expect(body.users.find((u) => u.name === "Bob").claimed).toBe(false);
+        expect(mockTripUserService.getClaimedSeatIds).toHaveBeenCalledWith(["member1", "member2"]);
+    });
+
+    test("claimed is derived from getClaimedSeatIds (the service answer wins)", async () => {
+        const encoded = encodeId("trip123");
+        mockTripService.getTrip.mockResolvedValueOnce(
+            fakeTrip({ users: [{ _id: "member1", name: "Alice", token: "should-not-leak" }] })
+        );
+        mockTripUserService.getClaimedSeatIds.mockResolvedValueOnce(new Set(["member1"]));
+
+        const res = await fetch(`${baseUrl}/trips/${encoded}`);
+        expect(res.status).toBe(200);
+        const user = (await res.json()).users[0];
+        expect(user.claimed).toBe(true);
+        expect(mockTripUserService.getClaimedSeatIds).toHaveBeenCalledWith(["member1"]);
+    });
+});
+
+describe("PUT /trips/:tripId (auth + membership)", () => {
+
+    test("updates and returns users with claimed flags", async () => {
+        const encoded = encodeId("trip123");
+        mockTripUserService.getTripUserByToken.mockResolvedValueOnce(memberUser);
+        const trip = fakeTrip();
+        trip.populate = async function () {
+            this.users = [{ _id: "member1", name: "Alice" }, { _id: "member2", name: "Bob" }];
+            return this;
+        };
+        mockTripService.getTrip.mockResolvedValueOnce(trip);
+        mockTripService.updateTrip.mockResolvedValueOnce(trip);
+        mockTripUserService.getClaimedSeatIds.mockResolvedValueOnce(new Set(["member2"]));
+
+        const res = await fetch(`${baseUrl}/trips/${encoded}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", "x-user-token": "tok-alice" },
+            body: JSON.stringify({ name: "Renamed" }),
+        });
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.name).toBe("Summer");
+        expect(body.users.find((u) => u.name === "Alice").claimed).toBe(false);
+        expect(body.users.find((u) => u.name === "Bob").claimed).toBe(true);
+    });
+});
 
 describe("POST /trips/batch (delegates to tripService.batchHydrate)", () => {
 

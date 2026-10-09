@@ -44,6 +44,22 @@ export const getTripUsersByTokens = async (tokens) => {
  * @param {string} tripUserId
  * @returns {Promise<string>} the new token
  */
+/**
+ * Ids of the currently claimed seats (token set) among the given seat ids.
+ * Lets read endpoints expose seat occupancy (`claimed` boolean) without ever
+ * selecting the tokens themselves.
+ * @param {Array} tripUserIds - ids of the trip's seats
+ * @returns {Promise<Set<string>>} the claimed seat ids
+ */
+export const getClaimedSeatIds = async (tripUserIds) => {
+    if (!tripUserIds?.length) return new Set();
+    const claimed = await TripUser.find({
+        _id: { $in: tripUserIds },
+        token: { $ne: null },
+    }).select("_id");
+    return new Set(claimed.map((u) => String(u._id)));
+}
+
 export const rotateTripUserToken = async (tripUserId) => {
     const newToken = crypto.randomBytes(32).toString("base64url");
     const updated = await TripUser.findByIdAndUpdate(
