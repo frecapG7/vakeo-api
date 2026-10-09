@@ -28,6 +28,13 @@ Notes de contexte pour travailler sur l'API v3. Fichier maintenu à la main — 
 - Omission silencisée des trips invisibles — distinguer "introuvable" d'interdit fuiterait l'existence des privés.
 - **Règle de visibilité dupliquée** : elle vit dans la query ET dans `canReadTrip` (`validationService`). Garder synchrones (`requireReadAccess` utilise `canReadTrip`).
 
+## Join = bascule de siège atomique (POST /trips/:tripId/join)
+
+- Le join accepte un header `x-user-token` **optionnel** (`optionalAuth`) : un appelant déjà assis dans le trip qui désigne un autre siège bascule en un seul appel — le couple leave+join côté front disparaît (et son risque d'incohérence avec lui).
+- `switchSeat(previousTripUserId, tripUserId)` (tripUserService) : claim **conditionnel** du nouveau siège PUIS release de l'ancien, dans `withTransaction` — siège cible pris → retour null, l'ancien siège reste tokenisé. `claimSeat`/`releaseSeat` acceptent désormais un `options` mongoose (session) ; signature rétro-compatible (v1/migrate non impactés).
+- Membre authentifié : le joinToken n'est plus requis sur un trip privé (l'appartenance est prouvée par le token de siège). Reclamer son propre siège = no-op (identité + token courants renvoyés) ; un membre sans siège cible reçoit son identité au lieu de `{ anonymous: true }`.
+- Un token d'un autre trip est ignoré (premier join normal, `claimSeat`).
+
 ## Transactions MongoDB
 
 - **Toujours `session.withTransaction`** (jamais le manuel `startTransaction/commitTransaction`) : retry auto des erreurs transitoires.
@@ -48,7 +55,7 @@ Notes de contexte pour travailler sur l'API v3. Fichier maintenu à la main — 
 
 ## Pièges repo
 
-- **Fichiers en CRLF** (`services/*`, `config/*`) vs LF (`routes/v3/*`, `tripUserService`) : les éditions multi-lignes échouent sur les CRLF — ancrer sur des lignes uniques.
+- **Fichiers en CRLF** (tout le repo, re-vérifié oct. 2026 — la note « routes/v3 et tripUserService en LF » était périmée) : les éditions multi-lignes par remplacement de texte échouent sur ces fichiers — ancrer sur des lignes uniques.
 - v1 (`routes/*.mjs`) partage les services. `tripService.search` (utilisé par v1) a reçu `isPrivate` en projection — même fuite corrigée des deux côtés, mais v1 n'est pas "migrée".
 - `Trip.find` avec projection explicite : toujours vérifier que les champs testés en aval (`isPrivate` !) y figurent.
 

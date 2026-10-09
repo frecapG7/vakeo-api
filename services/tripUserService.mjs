@@ -49,7 +49,7 @@ export const rotateTripUserToken = async (tripUserId) => {
     const updated = await TripUser.findByIdAndUpdate(
         tripUserId,
         { token: newToken },
-        { returnDocument: "after" }
+        { returnDocument: "after", ...options }
     ).select("+token");
     return updated?.token ?? null;
 }
@@ -58,29 +58,55 @@ export const rotateTripUserToken = async (tripUserId) => {
  * Atomically claim a free seat by minting a token on it.
  * Uses a conditional update so two simultaneous claims can't both succeed.
  * @param {string} tripUserId
+ * @param {object} [options] - mongoose options (e.g. session, for use in a transaction)
  * @returns {Promise<object|null>} the TripUser with token, or null if already claimed
  */
-export const claimSeat = async (tripUserId) => {
+export const claimSeat = async (tripUserId, options = {}) => {
     const newToken = crypto.randomBytes(32).toString("base64url");
     const claimed = await TripUser.findOneAndUpdate(
         { _id: tripUserId, token: null },
         { token: newToken },
-        { returnDocument: "after" }
+        { returnDocument: "after", ...options }
     ).select("+token");
     return claimed;
 }
 
 /**
  * Release a seat by clearing its token. The seat becomes free for someone else.
+ * @param {object} [options] - mongoose options (e.g. session, for use in a transaction)
  * @param {string} tripUserId
  * @returns {Promise<object|null>}
  */
-export const releaseSeat = async (tripUserId) => {
+export const releaseSeat = async (tripUserId, options = {}) => {
     return await TripUser.findByIdAndUpdate(
         tripUserId,
         { $unset: { token: "" } },
-        { returnDocument: "after" }
+        { returnDocument: "after", ...options }
     );
+}
+
+/**
+ * Atomically move a member to a new seat: mint a token on the target seat and
+ * release the previous one in the same transaction. The claim stays conditional
+ * (`token: null`), so an already-taken target seat rolls the whole move back
+ * and the previous seat is left untouched.
+ * @param {string} previousTripUserId - the seat to release once the new one is claimed
+ * @param {string} tripUserId - the seat to claim
+ * @returns {Promise<object|null>} the newly claimed TripUser with token, or null if taken
+ */
+export const switchSeat = async (previousTripUserId, tripUserId) => {
+    const session = await mongoose.startSession();
+    try {
+        let claimed = null;
+        await session.withTransaction(async () => {
+            claimed = await claimSeat(tripUserId, { session });
+            if (claimed)
+                await releaseSeat(previousTripUserId, { session });
+        });
+        return claimed;
+    } finally {
+        await session.endSession();
+    }
 }
 
 export const createTripUsers = async (users = []) => {

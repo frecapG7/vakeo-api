@@ -11,6 +11,7 @@ const mockTripUserService = {
     rotateTripUserToken: jest.fn(),
     claimSeat: jest.fn(),
     releaseSeat: jest.fn(),
+    switchSeat: jest.fn(),
 };
 
 const mockTripService = {
@@ -430,6 +431,143 @@ describe("POST /trips/:tripId/join", () => {
         const body = await res.json();
         expect(body.user.name).toBe("Charlie");
         expect(body.token).toBe("tok-charlie");
+    });
+
+    test("public trip: member switches seat atomically (200)", async () => {
+        const encoded = encodeId("trip123");
+        mockTripUserService.getTripUserByToken.mockResolvedValueOnce(memberUser);
+        mockTripService.getTrip.mockResolvedValueOnce(fakeTrip());
+        mockTripUserService.switchSeat.mockResolvedValueOnce({
+            _id: "member2", name: "Bob", avatar: "pic", token: "tok-bob",
+        });
+        mockTripUserService.claimSeat.mockClear();
+        mockTripUserService.releaseSeat.mockClear();
+
+        const res = await fetch(`${baseUrl}/trips/${encoded}/join`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-user-token": "tok-alice" },
+            body: JSON.stringify({ tripUserId: "member2" }),
+        });
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.user._id).toBe("member2");
+        expect(body.token).toBe("tok-bob");
+        expect(mockTripUserService.switchSeat).toHaveBeenCalledWith("member1", "member2");
+        expect(mockTripUserService.claimSeat).not.toHaveBeenCalled();
+        expect(mockTripUserService.releaseSeat).not.toHaveBeenCalled();
+    });
+
+    test("public trip: seat switch keeps the old seat when the new one is taken (403)", async () => {
+        const encoded = encodeId("trip123");
+        mockTripUserService.getTripUserByToken.mockResolvedValueOnce(memberUser);
+        mockTripService.getTrip.mockResolvedValueOnce(fakeTrip());
+        mockTripUserService.switchSeat.mockResolvedValueOnce(null);
+
+        const res = await fetch(`${baseUrl}/trips/${encoded}/join`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-user-token": "tok-alice" },
+            body: JSON.stringify({ tripUserId: "member2" }),
+        });
+        expect(res.status).toBe(403);
+        expect(mockTripUserService.switchSeat).toHaveBeenCalledWith("member1", "member2");
+    });
+
+    test("private trip: member switches seat without joinToken (200)", async () => {
+        const encoded = encodeId("trip123");
+        mockTripUserService.getTripUserByToken.mockResolvedValueOnce(memberUser);
+        mockTripService.getTrip.mockResolvedValueOnce(fakePrivateTrip());
+        mockTripUserService.switchSeat.mockResolvedValueOnce({
+            _id: "member2", name: "Bob", avatar: "pic", token: "tok-bob",
+        });
+        mockJoinTokenService.verifyJoinToken.mockClear();
+
+        const res = await fetch(`${baseUrl}/trips/${encoded}/join`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-user-token": "tok-alice" },
+            body: JSON.stringify({ tripUserId: "member2" }),
+        });
+        expect(res.status).toBe(200);
+        expect(mockTripUserService.switchSeat).toHaveBeenCalledWith("member1", "member2");
+        expect(mockJoinTokenService.verifyJoinToken).not.toHaveBeenCalled();
+    });
+
+    test("member claiming own seat: no-op, echoes current identity (200)", async () => {
+        const encoded = encodeId("trip123");
+        mockTripUserService.getTripUserByToken.mockResolvedValueOnce(memberUser);
+        mockTripService.getTrip.mockResolvedValueOnce(fakeTrip());
+        mockTripUserService.claimSeat.mockClear();
+        mockTripUserService.switchSeat.mockClear();
+
+        const res = await fetch(`${baseUrl}/trips/${encoded}/join`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-user-token": "tok-alice" },
+            body: JSON.stringify({ tripUserId: "member1" }),
+        });
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.user._id).toBe("member1");
+        expect(body.token).toBe("tok-alice");
+        expect(mockTripUserService.claimSeat).not.toHaveBeenCalled();
+        expect(mockTripUserService.switchSeat).not.toHaveBeenCalled();
+    });
+
+    test("public trip: member creates a new seat and switches to it (200)", async () => {
+        const encoded = encodeId("trip123");
+        const trip = { ...fakeTrip(), save: async () => {} };
+        mockTripUserService.getTripUserByToken.mockResolvedValueOnce(memberUser);
+        mockTripService.getTrip.mockResolvedValueOnce(trip);
+        mockTripUserService.addSeatsToTrip.mockResolvedValueOnce([{
+            _id: "newuser", name: "Charlie", avatar: "avatar",
+        }]);
+        mockTripUserService.switchSeat.mockResolvedValueOnce({
+            _id: "newuser", name: "Charlie", avatar: "avatar", token: "tok-charlie",
+        });
+
+        const res = await fetch(`${baseUrl}/trips/${encoded}/join`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-user-token": "tok-alice" },
+            body: JSON.stringify({ name: "Charlie" }),
+        });
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.user.name).toBe("Charlie");
+        expect(mockTripUserService.switchSeat).toHaveBeenCalledWith("member1", "newuser");
+    });
+
+    test("member calling join with no target seat: echoes current identity (200)", async () => {
+        const encoded = encodeId("trip123");
+        mockTripUserService.getTripUserByToken.mockResolvedValueOnce(memberUser);
+        mockTripService.getTrip.mockResolvedValueOnce(fakeTrip());
+
+        const res = await fetch(`${baseUrl}/trips/${encoded}/join`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-user-token": "tok-alice" },
+            body: JSON.stringify({}),
+        });
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.user._id).toBe("member1");
+        expect(body.token).toBe("tok-alice");
+        expect(body.anonymous).toBeUndefined();
+    });
+
+    test("token from another trip is ignored — claims like a new user (200)", async () => {
+        const encoded = encodeId("trip123");
+        mockTripUserService.getTripUserByToken.mockResolvedValueOnce(strangerUser);
+        mockTripService.getTrip.mockResolvedValueOnce(fakeTrip());
+        mockTripUserService.claimSeat.mockResolvedValueOnce({
+            _id: "member2", name: "Bob", avatar: "pic", token: "tok-bob",
+        });
+        mockTripUserService.switchSeat.mockClear();
+
+        const res = await fetch(`${baseUrl}/trips/${encoded}/join`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-user-token": "tok-stranger" },
+            body: JSON.stringify({ tripUserId: "member2" }),
+        });
+        expect(res.status).toBe(200);
+        expect(mockTripUserService.claimSeat).toHaveBeenCalledWith("member2");
+        expect(mockTripUserService.switchSeat).not.toHaveBeenCalled();
     });
 
     test("public trip: pass — browse anonymously (200)", async () => {

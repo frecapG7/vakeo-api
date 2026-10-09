@@ -7,7 +7,7 @@ import {
     dashboard,
     batchHydrate,
 } from "../../services/tripService.mjs";
-import { createTripUsers, claimSeat, releaseSeat, addSeatsToTrip } from "../../services/tripUserService.mjs";
+import { createTripUsers, claimSeat, releaseSeat, addSeatsToTrip, switchSeat } from "../../services/tripUserService.mjs";
 import { generateJoinToken, verifyJoinToken } from "../../services/joinTokenService.mjs";
 import { resolveEncodedTripId } from "../../services/idEncoderService.mjs";
 import { requireMembership, requireReadAccess } from "../../services/validationService.mjs";
@@ -139,22 +139,39 @@ app.post("/:tripId/share", auth, async (req, res) => {
 });
 
 /**
- * POST /:tripId/join — claim a seat and get a token (no auth — bootstrap for new users).
- * @body {string} [joinToken] - required for private trips
+ * POST /:tripId/join — claim a seat and get a token (soft auth — bootstrap for new users).
+ * The x-user-token header is optional: a caller already holding a seat of this trip
+ * switches seats in one atomic call instead of leave + join. A token from another
+ * trip is ignored (first join as normal).
+ * @body {string} [joinToken] - required for private trips, unless the caller is already a member
  * @body {string} [tripUserId] - id of an existing free seat to claim
  * @body {string} [name] - for public trips: create a new seat with this name
  * @body {string} [avatar] - optional avatar for a new seat
  * @returns {object} - { user, token } or { anonymous: true }
  */
-app.post("/:tripId/join", async (req, res) => {
+app.post("/:tripId/join", optionalAuth, async (req, res) => {
     const rawId = resolveEncodedTripId(req.params.tripId);
     const trip = await getTrip(rawId);
     const { joinToken = "", tripUserId, name, avatar } = req.body ?? {};
 
+    // An authenticated caller already holding a seat of this trip switches seats
+    const previousSeatId = req.user && trip.users.some((u) => u.toString() === String(req.user._id))
+        ? String(req.user._id)
+        : null;
+
+    // Claiming the seat already held: nothing to switch, echo the current identity
+    if (previousSeatId && String(tripUserId) === previousSeatId)
+        return res.status(200).json({
+            user: { _id: req.user._id, name: req.user.name, avatar: req.user.avatar },
+            token: req.user.token,
+        });
+
     if (trip.isPrivate) {
-        if (!joinToken)
+        // An authenticated member has already proven access; anyone else needs a join token
+        if (!joinToken && !previousSeatId)
             throw new ForbiddenError("Join token required for private trips");
-        await verifyJoinToken(joinToken, rawId);
+        if (joinToken)
+            await verifyJoinToken(joinToken, rawId);
 
         // Private: must pick an existing free seat
         if (!tripUserId)
@@ -163,7 +180,9 @@ app.post("/:tripId/join", async (req, res) => {
         if (!trip.users.some((u) => u.toString() === String(tripUserId)))
             throw new ForbiddenError("This seat is not part of this trip");
 
-        const claimed = await claimSeat(tripUserId);
+        const claimed = previousSeatId
+            ? await switchSeat(previousSeatId, tripUserId)
+            : await claimSeat(tripUserId);
         if (!claimed)
             throw new ForbiddenError("This seat is already taken");
 
@@ -179,7 +198,9 @@ app.post("/:tripId/join", async (req, res) => {
         if (!trip.users.some((u) => u.toString() === String(tripUserId)))
             throw new ForbiddenError("This seat is not part of this trip");
 
-        const claimed = await claimSeat(tripUserId);
+        const claimed = previousSeatId
+            ? await switchSeat(previousSeatId, tripUserId)
+            : await claimSeat(tripUserId);
         if (!claimed)
             throw new ForbiddenError("This seat is already taken");
 
@@ -196,8 +217,10 @@ app.post("/:tripId/join", async (req, res) => {
 
         const [newUser] = await addSeatsToTrip(rawId, [{ name, avatar }]);
 
-        // Mint token on the new seat
-        const claimed = await claimSeat(newUser._id);
+        // Mint token on the new seat (releasing the previous one if this is a switch)
+        const claimed = previousSeatId
+            ? await switchSeat(previousSeatId, newUser._id)
+            : await claimSeat(newUser._id);
 
         return res.status(200).json({
             user: { _id: claimed._id, name: claimed.name, avatar: claimed.avatar },
@@ -205,7 +228,14 @@ app.post("/:tripId/join", async (req, res) => {
         });
     }
 
-    // Pass — browse anonymously
+    // Pass — browse anonymously. A member with no target seat gets their
+    // current identity echoed back instead of an anonymous response.
+    if (previousSeatId)
+        return res.status(200).json({
+            user: { _id: req.user._id, name: req.user.name, avatar: req.user.avatar },
+            token: req.user.token,
+        });
+
     return res.status(200).json({ anonymous: true });
 });
 
