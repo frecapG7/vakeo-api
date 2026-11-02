@@ -94,6 +94,15 @@ Notes de contexte pour travailler sur l'API v3. Fichier maintenu à la main — 
 - Tests : `services/linkPreviewService.test.mjs` (17 cas `isPrivateAddress` dont IPv6 mapped, retry profil 2 simule booking, fallback, 422/403) + `routes/v3/linkPreview.test.mjs` (200/422/403). Le comportement REEL contre booking.com est hors portee des unites (lib mockee) — a verifier en integration manuelle.
 - **Deps** : `link-preview-js` pinné `^4.0.4` minimum (fix securite lib) — l''interface (`resolveDNSHost`, `handleRedirects`...) est inchangee, verifier le .d.ts si future upgrade majeure.
 - Si le taux de fallback reste eleve : prochaines etapes possibles = fetch maison + `getPreviewFromContent` (la lib v4 permet de parser du HTML pre-fetche, ex. via un proxy residentiel) ou un renderer headless type puppeteer — plus lourd.
+## Geocoding v3 (POST /v3/geocode)
+
+- Remplace le endpoint v1 (`routes/geocode.mjs`, conserve en legacy — meme service partage). Route = delegation pure ; validation, cache et selection de provider vivent dans `services/geocoding/index.mjs`.
+- **Mapbox par defaut** (Search Geocoding v6) : `MAPBOX_ACCESS_TOKEN` en env, lu au moment de l'appel — pas de fail-fast au demarrage (un token absent ne doit pas casser dev/tests), erreur claire si appel sans token. **A ajouter aux env de prod au deploy.** Nominatim (instance publique OSM, usage policy ~1 req/s + blocages — le "gratuit mais problematique en prod") reste derriere `setGeocodingProvider("nominatim")`, non utilise par defaut.
+- Securite : **POST** (l'adresse, donnee de voyage semi-sensible, ne transite pas dans les logs morgan contrairement a un GET query) ; validation cote service (string non vide, <= 300 chars apres trim → 422 `InvalidError`) ; rate limit dedie **30 req/min/IP** ; timeout 5s sur le fetch sortant (`AbortSignal.timeout`) ; reponses non-200 du provider → 500 generique via errorMiddleware (pas de fuite d'internes).
+- Cache memoire TTL 24h, plafonne a 500 entrees, cle = adresse trimmee ; a l'insert, purge des entrees expirees d'abord puis eviction FIFO. Les resultats vides ne sont pas caches (retry possible chez le provider). Les appels en vol sur la meme adresse sont dedoublonnes (map `inFlight`) : un burst ne hit le provider qu'une fois. Amortit le quota Mapbox (free tier 100k/mois).
+- Contrat de reponse inchange pour les deux versions : `{ coordinates: [lon, lat], displayName, provider }`, 200 avec `coordinates: []` quand le provider ne trouve rien — pas de 404 (le front teste la longitude/latitude).
+- v1 appelle le meme service : le passage a Mapbox + validation 422 impacte aussi `/api/geocode` (une adresse invalide y renvoie desormais 500 au lieu d'un appel Nominatim avec "undefined" — legacy accepte).
+
 ## Suivis ouverts
 
 - Migrer les routes v3 restantes vers `loadTripContext` + `buildNextCursor` (voir sections dédiées) — opportuniste, au fil des PR.

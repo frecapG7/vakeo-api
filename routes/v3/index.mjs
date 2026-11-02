@@ -10,6 +10,7 @@ import tripUsers from "./tripUsers.mjs";
 import events from "./events.mjs";
 import migrate from "./migrate.mjs";
 import linkPreview from "./linkPreview.mjs";
+import geocode from "./geocode.mjs";
 
 const app = express();
 
@@ -31,5 +32,6 @@ app.use(tripUsers);
 app.use(events);
 app.use("/migrate", migrate);
 app.use(linkPreview);
+app.use(geocode);
 
 export default app;
