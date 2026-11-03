@@ -27,6 +27,15 @@ export class ForbiddenError extends Error {
     }
 }
 
+export class ServiceUnavailableError extends Error {
+    constructor(message){
+        super(message);
+        this.name = "ServiceUnavailableError";
+        this.statusCode = 503
+    }
+}
+
+
 export class NotImplementedError extends Error {
     constructor(message){
         super(message);
