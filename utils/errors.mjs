@@ -34,3 +34,12 @@ export class ServiceUnavailableError extends Error {
         this.statusCode = 503
     }
 }
+
+
+export class NotImplementedError extends Error {
+    constructor(message){
+        super(message);
+        this.name = "NotImplementedError";
+        this.statusCode = 501
+    }
+}
