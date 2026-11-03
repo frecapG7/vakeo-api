@@ -1,6 +1,6 @@
 import { geocode as nominatimGeocode } from "./nominatim.mjs";
 import { geocode as mapboxGeocode } from "./mapbox.mjs";
-import { InvalidError } from "../../utils/errors.mjs";
+import { InvalidError, ServiceUnavailableError } from "../../utils/errors.mjs";
 
 
 const MAX_ADDRESS_LENGTH = 300;
@@ -11,6 +11,12 @@ const MAX_ADDRESS_LENGTH = 300;
 // burst of identical requests only hits the provider once.
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const CACHE_MAX_ENTRIES = 500;
+
+// inFlight is keyed by untrusted addresses and lives at most one provider
+// timeout window: without a cap, a burst of unique addresses grows memory
+// and fires unbounded parallel billable provider calls. Once the cap is
+// hit, reject with 503 before inserting instead of bypassing the dedup.
+export const MAX_IN_FLIGHT = 50;
 
 const cache = new Map();
 const inFlight = new Map();
@@ -59,6 +65,9 @@ export const geocode = async (address) => {
     const pending = inFlight.get(normalized);
     if (pending)
         return pending;
+
+    if (inFlight.size >= MAX_IN_FLIGHT)
+        throw new ServiceUnavailableError("Geocoding is under heavy load, please retry shortly");
 
     const promise = provider(normalized)
         .then((result) => {

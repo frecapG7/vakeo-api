@@ -27,10 +27,10 @@ export class ForbiddenError extends Error {
     }
 }
 
-export class NotImplementedError extends Error {
+export class ServiceUnavailableError extends Error {
     constructor(message){
         super(message);
-        this.name = "NotImplementedError";
-        this.statusCode = 501
+        this.name = "ServiceUnavailableError";
+        this.statusCode = 503
     }
 }

@@ -70,6 +70,21 @@ describe("POST /geocode (v3)", () => {
         expect(body.message).toBe("Missing or empty address");
     });
 
+    test("surfaces in-flight saturation as 503 via the error middleware", async () => {
+        const { ServiceUnavailableError } = await import("../../utils/errors.mjs");
+        mockGeocodingService.geocode.mockRejectedValueOnce(new ServiceUnavailableError("Geocoding is under heavy load, please retry shortly"));
+
+        const res = await fetch(`${baseUrl}/geocode`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(validBody),
+        });
+
+        expect(res.status).toBe(503);
+        const body = await res.json();
+        expect(body.message).toBe("Geocoding is under heavy load, please retry shortly");
+    });
+
     test("returns a generic 500 on unexpected provider errors", async () => {
         mockGeocodingService.geocode.mockRejectedValueOnce(new Error("Mapbox request failed: timeout"));
 

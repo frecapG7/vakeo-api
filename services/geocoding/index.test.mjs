@@ -1,5 +1,5 @@
 import { jest } from "@jest/globals";
-import { geocode, setGeocodingProvider } from "./index.mjs";
+import { geocode, setGeocodingProvider, MAX_IN_FLIGHT } from "./index.mjs";
 
 
 const mapboxResponse = (features) => ({
@@ -160,5 +160,52 @@ describe("geocode (nominatim provider, opt-in)", () => {
             displayName: "Rennes, France",
             provider: "nominatim",
         });
+    });
+});
+
+describe("geocode (in-flight cap)", () => {
+    test("rejects unique addresses beyond the cap with 503 without extra provider calls", async () => {
+        let release;
+        const gate = new Promise((resolve) => { release = resolve; });
+        const fetchMock = jest.spyOn(globalThis, "fetch").mockImplementation(
+            () => gate.then(() => mapboxResponse([]))
+        );
+
+        const calls = Array.from({ length: MAX_IN_FLIGHT + 5 }, (_, i) => {
+            const call = geocode(`flood-${i}`);
+            call.catch(() => {});
+            return call;
+        });
+        release();
+
+        const settled = await Promise.allSettled(calls);
+        const rejected = settled.filter((entry) => entry.status === "rejected");
+
+        expect(rejected).toHaveLength(5);
+        for (const entry of rejected)
+            expect(entry.reason).toMatchObject({ name: "ServiceUnavailableError", statusCode: 503 });
+        expect(fetchMock).toHaveBeenCalledTimes(MAX_IN_FLIGHT);
+    });
+
+    test("still deduplicates an already in-flight address at the cap", async () => {
+        let release;
+        const gate = new Promise((resolve) => { release = resolve; });
+        const fetchMock = jest.spyOn(globalThis, "fetch").mockImplementation(
+            () => gate.then(() => mapboxResponse([]))
+        );
+
+        const filler = Array.from({ length: MAX_IN_FLIGHT }, (_, i) => {
+            const call = geocode(`saturation-${i}`);
+            call.catch(() => {});
+            return call;
+        });
+        const joiner = geocode("saturation-0");
+        joiner.catch(() => {});
+        release();
+
+        const settled = await Promise.allSettled([...filler, joiner]);
+
+        expect(settled.every((entry) => entry.status === "fulfilled")).toBe(true);
+        expect(fetchMock).toHaveBeenCalledTimes(MAX_IN_FLIGHT);
     });
 });
