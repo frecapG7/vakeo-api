@@ -1,6 +1,6 @@
 # AGENTS.md — vakeo-api
 
-API Express (ESM, "type": "module") pour l'app de planification de voyages Vakeo. MongoDB via mongoose. Deux versions de routes cohabitent : v1 (`routes/*.mjs`, legacy, non migrée) et v3 (`routes/v3/*.mjs`, active).
+API Express (ESM, "type": "module") pour l'app de planification de voyages Vakeo. MongoDB via mongoose. Une seule version de routes : v3 (`routes/v3/*.mjs`), montée sous `/api/v3`. Les routes v1 (`routes/*.mjs`) ont été supprimées.
 
 ## Lire en premier
 
@@ -27,7 +27,6 @@ API Express (ESM, "type": "module") pour l'app de planification de voyages Vakeo
 - **Projections mongoose** : quand un champ est ajouté à un schéma (ex. `reactions` sur Message), vérifier toutes les projections existantes qui le traversent (`search` de messageService). Les mocks de tests ne détectent pas les champs manquants.
 - **Tests mockés via `jest.unstable_mockModule`** : un mock de service doit fournir TOUTES les exports que les routes importent (ESM valide les imports nommés).
 - Les fonctions DB (mongoose) ne sont pas testées unitairement — le tester via tests de routes (mock du service) + intégration manuelle. Convention documentée dans les fichiers de test existants.
-- v1 et v3 partagent les services : un changement de service impacte les deux versions ; vérifier les usages v1 avant de changer une signature.
 
 ## Git
 

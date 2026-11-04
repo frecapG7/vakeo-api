@@ -5,39 +5,10 @@ import Event from "../models/eventModel.mjs";
 import Link from "../models/linkModel.mjs";
 import { Poll } from "../models/pollModel.mjs";
 import { InvalidError, NotFoundError } from "../utils/errors.mjs";
-import { sanitizeSearchText } from "../utils/pagination.mjs";
 import { encodeId, resolveEncodedTripId } from "./idEncoderService.mjs";
 import { getTripUsersByTokens } from "./tripUserService.mjs";
 import { verifyDates } from "./validationService.mjs";
 import TripUser from "../models/tripUserModel.mjs";
-
-export const search = async ({ ids, search }) => {
-
-  if (!ids)
-    return [];
-
-  const searchIds = ids.split(",");
-
-  let query = {
-    _id: { $in: searchIds },
-  }
-  const escapedSearch = sanitizeSearchText(search);
-  if (escapedSearch)
-    query.name = { $regex: escapedSearch, $options: "i" }
-
-  const trips = await Trip.find(
-    query,
-    "users name image startDate endDate createdAt isPrivate", {
-    limit: 20,
-    sort: {
-      createdAt: -1
-    }
-  })
-    .populate("users", "avatar name");
-
-  return trips;
-
-}
 
 /**
  * Batch-hydrate trips for the v3 client, each entry carrying its own credential.
