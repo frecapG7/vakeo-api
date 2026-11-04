@@ -8,7 +8,6 @@ import links from "./links.mjs";
 import messages from "./messages.mjs";
 import tripUsers from "./tripUsers.mjs";
 import events from "./events.mjs";
-import migrate from "./migrate.mjs";
 import linkPreview from "./linkPreview.mjs";
 import geocode from "./geocode.mjs";
 
@@ -30,7 +29,6 @@ app.use(links);
 app.use(messages);
 app.use(tripUsers);
 app.use(events);
-app.use("/migrate", migrate);
 app.use(linkPreview);
 app.use(geocode);
 

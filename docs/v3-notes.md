@@ -70,8 +70,8 @@ Notes de contexte pour travailler sur l'API v3. Fichier maintenu à la main — 
 
 - **Probleme** : `encodeId` (AES-256-GCM, IV aleatoire) n'etait pas idempotent — deux mints du meme trip donnaient deux strings valides mais distinctes. Le front memorisant des couples (encodedId, token), un meme trip partage/joint plusieurs fois creeait des entrees dupliquees.
 - **Decision (option A, persiste)** : champ `Trip.encodedId` (String, unique, **sparse** — obligatoire pour que les trips legacy sans le champ ne violent pas l'index unique). Minte une seule fois par hook `pre("save")` dans tripModel, jamais regenere.
-- Contrat : **tous les points qui servent un encodedId lisent le champ persiste** — POST /trips (creation), GET /trips/:tripId (inclus via toObject), resolution des join tokens (`tokens.mjs`), `migrate.mjs`. `batchHydrate` continue d'echoyer l'id envoye par le client. **Jamais de `encodeId(trip._id)` en route** : c'est le bug.
-- Trips legacy sans champ : `tripService.getOrCreateEncodedId(trip)` mint + persiste paresseusement a la volee (update atomique `$exists`-garde, first-write-wins, les perdants relisent le gagnant). `migrate.mjs` est donc le vecteur de migration naturel : chaque appel cutover persiste l'id du trip migre.
+- Contrat : **tous les points qui servent un encodedId lisent le champ persiste** — POST /trips (creation), GET /trips/:tripId (inclus via toObject), resolution des join tokens (`tokens.mjs`). `batchHydrate` continue d'echoyer l'id envoye par le client. **Jamais de `encodeId(trip._id)` en route** : c'est le bug.
+- Trips legacy sans champ : `tripService.getOrCreateEncodedId(trip)` mint + persiste paresseusement a la volee (update atomique `$exists`-garde, first-write-wins, les perdants relisent le gagnant).
 - Backfill one-shot : `node scripts/backfillEncodedIds.mjs` (meme garde `$exists`, sur a lancer pendant que l'API tourne ; exit 1 s'il reste des trips sans champ).
 - Les ancres : le resolve reste `decodeId` (chiffrement aleatoire conserve — la stabilite vient de la persistance, pas du determinisme). Une rotation de `OBFUSCATION_KEY` casserait toujours les ids stockes cote front, mais le champ en base permettrait un jour de resoudre par lookup DB.
 ## Reactions sur les messages (v3)
@@ -106,7 +106,7 @@ Notes de contexte pour travailler sur l'API v3. Fichier maintenu à la main — 
 ## Suivis ouverts
 
 - Migrer les routes v3 restantes vers `loadTripContext` + `buildNextCursor` (voir sections dédiées) — opportuniste, au fil des PR.
-- Lancer `node scripts/backfillEncodedIds.mjs` en prod apres le deploy (les appels migrate/tokens auto-guerissent le reste opportunistement).
+- Lancer `node scripts/backfillEncodedIds.mjs` en prod apres le deploy (les appels tokens auto-guerissent le reste opportunistement).
 - Vérification manuelle en conditions réelles : transactions tripStops (créations concurrentes à 49 stops), batch hydrate.
 - Pas de test couvrant le curseur des messages contre une vraie query (service mocké).
 - UserAccount (comptes) : non prévu court terme ; si introduit, revoir `GET /`-like et `requireSeatOwnership`.
