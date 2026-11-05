@@ -28,7 +28,7 @@ dist
 coverage
 
 # Ignore Docker-related files
-Dockerfile
+Docker*
 .dockerignore
 
 # Ignore repo meta and test artifacts not needed at runtime
