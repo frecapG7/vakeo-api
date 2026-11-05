@@ -31,7 +31,7 @@ Notes de contexte pour travailler sur l'API v3. Fichier maintenu à la main — 
 ## Join = bascule de siège atomique (POST /trips/:tripId/join)
 
 - Le join accepte un header `x-user-token` **optionnel** (`optionalAuth`) : un appelant déjà assis dans le trip qui désigne un autre siège bascule en un seul appel — le couple leave+join côté front disparaît (et son risque d'incohérence avec lui).
-- `switchSeat(previousTripUserId, tripUserId)` (tripUserService) : claim **conditionnel** du nouveau siège PUIS release de l'ancien, dans `withTransaction` — siège cible pris → retour null, l'ancien siège reste tokenisé. `claimSeat`/`releaseSeat` acceptent désormais un `options` mongoose (session) ; signature rétro-compatible (v1/migrate non impactés).
+- `switchSeat(previousTripUserId, tripUserId)` (tripUserService) : claim **conditionnel** du nouveau siège PUIS release de l'ancien, dans `withTransaction` — siège cible pris → retour null, l'ancien siège reste tokenisé. `claimSeat`/`releaseSeat` acceptent désormais un `options` mongoose (session) ; signature retro-compatible.
 - Membre authentifié : le joinToken n'est plus requis sur un trip privé (l'appartenance est prouvée par le token de siège). Reclamer son propre siège = no-op (identité + token courants renvoyés) ; un membre sans siège cible reçoit son identité au lieu de `{ anonymous: true }`.
 - Un token d'un autre trip est ignoré (premier join normal, `claimSeat`).
 
@@ -56,7 +56,7 @@ Notes de contexte pour travailler sur l'API v3. Fichier maintenu à la main — 
 ## Pièges repo
 
 - **Fichiers en CRLF** (tout le repo, re-vérifié oct. 2026 — la note « routes/v3 et tripUserService en LF » était périmée) : les éditions multi-lignes par remplacement de texte échouent sur ces fichiers — ancrer sur des lignes uniques.
-- v1 (`routes/*.mjs`) partage les services. `tripService.search` (utilisé par v1) a reçu `isPrivate` en projection — même fuite corrigée des deux côtés, mais v1 n'est pas "migrée".
+- **v1 supprimée (2026-11-04)** : `routes/*.mjs` (routes, tokens et share legacy), `services/votesService.mjs`, `models/voteModel.mjs`, `services/tokenService.mjs` (JWT legacy), la stratégie passport `user-header` et `tripService.search` retirés avec elle. Seule surface HTTP : `/api/v3`.
 - `Trip.find` avec projection explicite : toujours vérifier que les champs testés en aval (`isPrivate` !) y figurent.
 
 ## Contexte trip dans les routes v3 (`loadTripContext`)
@@ -70,8 +70,8 @@ Notes de contexte pour travailler sur l'API v3. Fichier maintenu à la main — 
 
 - **Probleme** : `encodeId` (AES-256-GCM, IV aleatoire) n'etait pas idempotent — deux mints du meme trip donnaient deux strings valides mais distinctes. Le front memorisant des couples (encodedId, token), un meme trip partage/joint plusieurs fois creeait des entrees dupliquees.
 - **Decision (option A, persiste)** : champ `Trip.encodedId` (String, unique, **sparse** — obligatoire pour que les trips legacy sans le champ ne violent pas l'index unique). Minte une seule fois par hook `pre("save")` dans tripModel, jamais regenere.
-- Contrat : **tous les points qui servent un encodedId lisent le champ persiste** — POST /trips (creation), GET /trips/:tripId (inclus via toObject), resolution des join tokens (`tokens.mjs`), `migrate.mjs`. `batchHydrate` continue d'echoyer l'id envoye par le client. **Jamais de `encodeId(trip._id)` en route** : c'est le bug.
-- Trips legacy sans champ : `tripService.getOrCreateEncodedId(trip)` mint + persiste paresseusement a la volee (update atomique `$exists`-garde, first-write-wins, les perdants relisent le gagnant). `migrate.mjs` est donc le vecteur de migration naturel : chaque appel cutover persiste l'id du trip migre.
+- Contrat : **tous les points qui servent un encodedId lisent le champ persiste** — POST /trips (creation), GET /trips/:tripId (inclus via toObject), resolution des join tokens (`tokens.mjs`). `batchHydrate` continue d'echoyer l'id envoye par le client. **Jamais de `encodeId(trip._id)` en route** : c'est le bug.
+- Trips legacy sans champ : `tripService.getOrCreateEncodedId(trip)` mint + persiste paresseusement a la volee (update atomique `$exists`-garde, first-write-wins, les perdants relisent le gagnant).
 - Backfill one-shot : `node scripts/backfillEncodedIds.mjs` (meme garde `$exists`, sur a lancer pendant que l'API tourne ; exit 1 s'il reste des trips sans champ).
 - Les ancres : le resolve reste `decodeId` (chiffrement aleatoire conserve — la stabilite vient de la persistance, pas du determinisme). Une rotation de `OBFUSCATION_KEY` casserait toujours les ids stockes cote front, mais le champ en base permettrait un jour de resoudre par lookup DB.
 ## Reactions sur les messages (v3)
@@ -87,7 +87,7 @@ Notes de contexte pour travailler sur l'API v3. Fichier maintenu à la main — 
 - Ne jamais committer de token ou cle API dans un `.bru` — l''historique git les rend grillables (rotation obligatoire sinon).
 ## Link preview v3 (POST /v3/link-preview)
 
-- Remplace le endpoint v1 (`routes/link-preview.mjs`, conserve en legacy). Logique dans `services/linkPreviewService.mjs`, route = delegation. Pas de trip scope : ouvert derriere la cle API + rate limit dedie **20 req/min/IP** (le global 1000/15min est trop leger pour un scraper).
+- Le endpoint v1 (`routes/link-preview.mjs`) a été supprimé avec la v1. Logique dans `services/linkPreviewService.mjs`, route = delegation. Pas de trip scope : ouvert derriere la cle API + rate limit dedie **20 req/min/IP** (le global 1000/15min est trop leger pour un scraper).
 - **SSRF** : `resolvePublicAddress` (dns.lookup + `isPrivateAddress`) rejette loopback, privees 10/172.16/192.168, CGNAT 100.64/10, link-local 169.254/16 (metadata cloud), multicast, et leurs equivalents IPv6. Passe aussi a la lib via `resolveDNSHost` → chaque redirect revalide. 403 `ForbiddenError` si vise ; 422 si URL mal formee ou host non resolvable (v1 renvoyait 500, corrige).
 - **Anti-bot (booking.com & co)** : 2 profils navigateur reels (Chrome complet avec sec-fetch headers, puis Safari) — essai 1, si le titre matche les `DENIED_KEYWORDS` (murs Cloudflare, "Just a moment", captcha...) on retente avec le profil 2. Si tout est rebute : **carte fallback** `{ title: domaine, fallback: true }` — le front rend toujours quelque chose. Timeout 10s par essai (v1 : 30s).
 - Redirections : `manual` + `isSameSiteRedirect` — https **uniquement** (pas de downgrade http), meme hote, variantes www, et sous-domaines de la racine du site (booking bascule fr.booking.com / secure.booking.com ; le www initial est retire pour le check de suffixe), cible revalidee par le garde DNS a chaque hop. Testee unitairement (`isSameSiteRedirect` exportee).
@@ -96,18 +96,17 @@ Notes de contexte pour travailler sur l'API v3. Fichier maintenu à la main — 
 - Si le taux de fallback reste eleve : prochaines etapes possibles = fetch maison + `getPreviewFromContent` (la lib v4 permet de parser du HTML pre-fetche, ex. via un proxy residentiel) ou un renderer headless type puppeteer — plus lourd.
 ## Geocoding v3 (POST /v3/geocode)
 
-- Remplace le endpoint v1 (`routes/geocode.mjs`, conserve en legacy — meme service partage). Route = delegation pure ; validation, cache et selection de provider vivent dans `services/geocoding/index.mjs`.
+- Le endpoint v1 (`routes/geocode.mjs`) a été supprimé avec la v1. Route = delegation pure ; validation, cache et selection de provider vivent dans `services/geocoding/index.mjs`.
 - **Mapbox par defaut** (Search Geocoding v6) : `MAPBOX_ACCESS_TOKEN` en env, lu au moment de l'appel — pas de fail-fast au demarrage (un token absent ne doit pas casser dev/tests), erreur claire si appel sans token. **A ajouter aux env de prod au deploy.** Nominatim (instance publique OSM, usage policy ~1 req/s + blocages — le "gratuit mais problematique en prod") reste derriere `setGeocodingProvider("nominatim")`, non utilise par defaut.
 - Securite : **POST** (l'adresse, donnee de voyage semi-sensible, ne transite pas dans les logs morgan contrairement a un GET query) ; validation cote service (string non vide, <= 300 chars apres trim → 422 `InvalidError`) ; rate limit dedie **30 req/min/IP** ; timeout 5s sur le fetch sortant (`AbortSignal.timeout`) ; reponses non-200 du provider → 500 generique via errorMiddleware (pas de fuite d'internes).
 - Cache memoire TTL 24h, plafonne a 500 entrees, cle = adresse trimmee ; a l'insert, purge des entrees expirees d'abord puis eviction FIFO. Les resultats vides ne sont pas caches (retry possible chez le provider). Les appels en vol sur la meme adresse sont dedoublonnes (map `inFlight`) : un burst ne hit le provider qu'une fois. Amortit le quota Mapbox (free tier 100k/mois).
 - **Plafond `MAX_IN_FLIGHT` (50) sur la map `inFlight`** (review PR #78) : clee par des adresses non fiables, elle vivrait sinon au max une fenetre de timeout (5s) SANS borne — un flood d'adresses uniques depuis plusieurs IP (le limiter 30 req/min est par IP, la concurrence agregree est non bornee) fait fuiter la memoire ET lance des appels Mapbox paralleles non bornes (factures au requete). Au-dela du cap : rejet 503 (`ServiceUnavailableError`, nouvelle erreur dans `utils/errors.mjs`) AVANT l'appel provider — pas de fallback direct-sans-dedup, le cap protege surtout les appels sortants, pas juste la memoire. Le dedup reste valable pour une adresse deja en vol meme a saturation.
 - Contrat de reponse inchange pour les deux versions : `{ coordinates: [lon, lat], displayName, provider }`, 200 avec `coordinates: []` quand le provider ne trouve rien — pas de 404 (le front teste la longitude/latitude).
-- v1 appelle le meme service : le passage a Mapbox + validation 422 impacte aussi `/api/geocode` (une adresse invalide y renvoie desormais 500 au lieu d'un appel Nominatim avec "undefined" — legacy accepte).
 
 ## Suivis ouverts
 
 - Migrer les routes v3 restantes vers `loadTripContext` + `buildNextCursor` (voir sections dédiées) — opportuniste, au fil des PR.
-- Lancer `node scripts/backfillEncodedIds.mjs` en prod apres le deploy (les appels migrate/tokens auto-guerissent le reste opportunistement).
+- Lancer `node scripts/backfillEncodedIds.mjs` en prod apres le deploy (les appels tokens auto-guerissent le reste opportunistement).
 - Vérification manuelle en conditions réelles : transactions tripStops (créations concurrentes à 49 stops), batch hydrate.
 - Pas de test couvrant le curseur des messages contre une vraie query (service mocké).
 - UserAccount (comptes) : non prévu court terme ; si introduit, revoir `GET /`-like et `requireSeatOwnership`.
