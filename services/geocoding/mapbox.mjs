@@ -1,5 +1,6 @@
 const ENDPOINT = "https://api.mapbox.com/search/geocode/v6/forward";
 const TIMEOUT_MS = 5000;
+const MAX_RESULTS = 5;
 
 
 export const geocode = async (address) => {
@@ -9,7 +10,7 @@ export const geocode = async (address) => {
 
     const url = new URL(ENDPOINT);
     url.searchParams.append("q", address);
-    url.searchParams.append("limit", "1");
+    url.searchParams.append("limit", String(MAX_RESULTS));
     url.searchParams.append("access_token", token);
 
     let response;
@@ -26,18 +27,13 @@ export const geocode = async (address) => {
         throw new Error(`Mapbox request failed with status ${response.status}`);
 
     const data = await response.json();
-    const feature = data.features?.[0];
-    if (!feature) {
-        return {
-            coordinates: [],
-            displayName: "No results",
+    // Every match must be placeable: features without a usable [lon, lat]
+    // pair are dropped rather than returned with empty coordinates.
+    return (data.features ?? [])
+        .filter((feature) => (feature.geometry?.coordinates?.length ?? 0) > 1)
+        .map((feature) => ({
+            coordinates: feature.geometry.coordinates,
+            displayName: feature.properties?.full_address ?? address,
             provider: "mapbox",
-        };
-    }
-
-    return {
-        coordinates: feature.geometry?.coordinates ?? [],
-        displayName: feature.properties?.full_address ?? address,
-        provider: "mapbox",
-    };
+        }));
 };

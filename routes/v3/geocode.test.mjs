@@ -30,11 +30,18 @@ describe("POST /geocode (v3)", () => {
     const validBody = { address: "12 rue de la Paix, Paris" };
 
     test("delegates to the service and wraps the result (200)", async () => {
-        mockGeocodingService.geocode.mockResolvedValueOnce({
-            coordinates: [2.3316, 48.8676],
-            displayName: "12 Rue de la Paix, 75002 Paris, France",
-            provider: "mapbox",
-        });
+        mockGeocodingService.geocode.mockResolvedValueOnce([
+            {
+                coordinates: [2.3316, 48.8676],
+                displayName: "12 Rue de la Paix, 75002 Paris, France",
+                provider: "mapbox",
+            },
+            {
+                coordinates: [-1.5536, 47.2184],
+                displayName: "Rue de la Paix, 44000 Nantes, France",
+                provider: "mapbox",
+            },
+        ]);
 
         const res = await fetch(`${baseUrl}/geocode`, {
             method: "POST",
@@ -46,11 +53,18 @@ describe("POST /geocode (v3)", () => {
         const body = await res.json();
         expect(body).toEqual({
             success: true,
-            data: {
-                coordinates: [2.3316, 48.8676],
-                displayName: "12 Rue de la Paix, 75002 Paris, France",
-                provider: "mapbox",
-            },
+            data: [
+                {
+                    coordinates: [2.3316, 48.8676],
+                    displayName: "12 Rue de la Paix, 75002 Paris, France",
+                    provider: "mapbox",
+                },
+                {
+                    coordinates: [-1.5536, 47.2184],
+                    displayName: "Rue de la Paix, 44000 Nantes, France",
+                    provider: "mapbox",
+                },
+            ],
         });
         expect(mockGeocodingService.geocode).toHaveBeenCalledWith("12 rue de la Paix, Paris");
     });

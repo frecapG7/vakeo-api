@@ -48,29 +48,59 @@ describe("geocode (mapbox provider, default)", () => {
 
         const result = await geocode("  Paris  ");
 
-        expect(result).toEqual({
-            coordinates: [2.3522, 48.8566],
-            displayName: "Paris, France",
-            provider: "mapbox",
-        });
+        expect(result).toEqual([
+            {
+                coordinates: [2.3522, 48.8566],
+                displayName: "Paris, France",
+                provider: "mapbox",
+            },
+        ]);
 
         const url = new URL(fetchMock.mock.calls[0][0]);
         expect(url.origin + url.pathname).toBe("https://api.mapbox.com/search/geocode/v6/forward");
         expect(url.searchParams.get("q")).toBe("Paris");
         expect(url.searchParams.get("access_token")).toBe("pk.test-token");
-        expect(url.searchParams.get("limit")).toBe("1");
+        expect(url.searchParams.get("limit")).toBe("5");
     });
 
-    test("returns empty coordinates when the provider finds nothing", async () => {
+    test("maps the ranked features in order", async () => {
+        jest.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+            mapboxResponse([
+                { geometry: { coordinates: [1.4434, 43.6047] }, properties: { full_address: "Toulouse, France" } },
+                { geometry: { coordinates: [1.4478, 43.6006] }, properties: { full_address: "Toulouse, 31000 Toulouse, France" } },
+            ])
+        );
+
+        const result = await geocode("Foix");
+
+        expect(result).toEqual([
+            { coordinates: [1.4434, 43.6047], displayName: "Toulouse, France", provider: "mapbox" },
+            { coordinates: [1.4478, 43.6006], displayName: "Toulouse, 31000 Toulouse, France", provider: "mapbox" },
+        ]);
+    });
+
+    test("drops matches without usable coordinates", async () => {
+        jest.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+            mapboxResponse([
+                { properties: { full_address: "No Geometry, Void" } },
+                { geometry: {}, properties: { full_address: "Empty Geometry, Void" } },
+                { geometry: { coordinates: [-1.5536, 47.2184] }, properties: { full_address: "Nantes, France" } },
+            ])
+        );
+
+        const result = await geocode("Narnia");
+
+        expect(result).toEqual([
+            { coordinates: [-1.5536, 47.2184], displayName: "Nantes, France", provider: "mapbox" },
+        ]);
+    });
+
+    test("returns an empty list when the provider finds nothing", async () => {
         jest.spyOn(globalThis, "fetch").mockResolvedValueOnce(mapboxResponse([]));
 
         const result = await geocode("zzzz-not-a-place-qwerty");
 
-        expect(result).toEqual({
-            coordinates: [],
-            displayName: "No results",
-            provider: "mapbox",
-        });
+        expect(result).toEqual([]);
     });
 
     test("surfaces provider HTTP failures", async () => {
@@ -155,11 +185,13 @@ describe("geocode (nominatim provider, opt-in)", () => {
 
         const result = await geocode("Rennes");
 
-        expect(result).toEqual({
-            coordinates: [-1.6805, 48.1119],
-            displayName: "Rennes, France",
-            provider: "nominatim",
-        });
+        expect(result).toEqual([
+            {
+                coordinates: [-1.6805, 48.1119],
+                displayName: "Rennes, France",
+                provider: "nominatim",
+            },
+        ]);
     });
 });
 
