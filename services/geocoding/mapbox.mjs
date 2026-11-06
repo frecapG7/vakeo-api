@@ -28,12 +28,14 @@ export const geocode = async (address) => {
 
     const data = await response.json();
     // Every match must be placeable: features without a usable [lon, lat]
-    // pair are dropped rather than returned with empty coordinates.
+    // pair are dropped rather than returned with empty coordinates. The cap
+    // is enforced here as well — the provider's limit param alone is not trusted.
     return (data.features ?? [])
         .filter((feature) => (feature.geometry?.coordinates?.length ?? 0) > 1)
         .map((feature) => ({
             coordinates: feature.geometry.coordinates,
             displayName: feature.properties?.full_address ?? address,
             provider: "mapbox",
-        }));
+        }))
+        .slice(0, MAX_RESULTS);
 };

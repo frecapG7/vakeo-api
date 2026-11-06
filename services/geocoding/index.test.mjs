@@ -172,6 +172,28 @@ describe("geocode (mapbox provider, default)", () => {
 
         expect(fetchMock).toHaveBeenCalledTimes(2);
     });
+
+    test("caps the list at five matches even if the provider returns more", async () => {
+        jest.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+            mapboxResponse(
+                Array.from({ length: 7 }, (_, i) => ({
+                    geometry: { coordinates: [i, i] },
+                    properties: { full_address: `Candidate ${i}, Void` },
+                }))
+            )
+        );
+
+        const result = await geocode("Ratatouille");
+
+        expect(result).toHaveLength(5);
+        expect(result.map((item) => item.displayName)).toEqual([
+            "Candidate 0, Void",
+            "Candidate 1, Void",
+            "Candidate 2, Void",
+            "Candidate 3, Void",
+            "Candidate 4, Void",
+        ]);
+    });
 });
 
 
@@ -191,6 +213,34 @@ describe("geocode (nominatim provider, opt-in)", () => {
                 displayName: "Rennes, France",
                 provider: "nominatim",
             },
+        ]);
+    });
+
+    test("drops unusable matches and caps the list at five", async () => {
+        setGeocodingProvider("nominatim");
+        const entry = (i) => ({ lat: "48.1119", lon: "-1.6805", display_name: `Ville ${i}, France` });
+        jest.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+            ok: true,
+            json: async () => [
+                entry(0),
+                { lat: "broken", lon: "-1.6805", display_name: "NaN, Void" },
+                entry(1),
+                entry(2),
+                entry(3),
+                entry(4),
+                entry(5),
+                entry(6),
+            ],
+        });
+
+        const result = await geocode("Rennes-ish");
+
+        expect(result).toEqual([
+            { coordinates: [-1.6805, 48.1119], displayName: "Ville 0, France", provider: "nominatim" },
+            { coordinates: [-1.6805, 48.1119], displayName: "Ville 1, France", provider: "nominatim" },
+            { coordinates: [-1.6805, 48.1119], displayName: "Ville 2, France", provider: "nominatim" },
+            { coordinates: [-1.6805, 48.1119], displayName: "Ville 3, France", provider: "nominatim" },
+            { coordinates: [-1.6805, 48.1119], displayName: "Ville 4, France", provider: "nominatim" },
         ]);
     });
 });
