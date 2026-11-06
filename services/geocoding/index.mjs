@@ -30,7 +30,7 @@ export const setGeocodingProvider = (name) => {
 
 
 const cacheResult = (key, result) => {
-    if (!Array.isArray(result.coordinates) || result.coordinates.length === 0)
+    if (!Array.isArray(result) || result.length === 0)
         return;
 
     if (cache.size >= CACHE_MAX_ENTRIES) {
