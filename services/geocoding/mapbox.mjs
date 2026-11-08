@@ -37,5 +37,7 @@ export const geocode = async (address) => {
             displayName: feature.properties?.full_address ?? address,
             provider: "mapbox",
         }))
+        .filter((result) =>
+                Number.isFinite(result.coordinates[0]) && Number.isFinite(result.coordinates[1]))
         .slice(0, MAX_RESULTS);
 };
