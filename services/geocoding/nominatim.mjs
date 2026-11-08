@@ -1,4 +1,5 @@
 import { GEOCODE_MAX_RESULTS } from "../../utils/constants.mjs";
+import { compactArray } from "../../utils/validator.mjs";
 
 const headers = new Headers({
     // "Accept"       : "application/json",
@@ -20,9 +21,11 @@ export const geocode = async (address) => {
         });
         const data = await response.json();
         // Same invariant as the mapbox provider: every returned match carries
-        // a placeable [lon, lat] pair. The max-5 cap is not applied here:
-        // the service layer slices once for every provider (review PR #80).
-        return (Array.isArray(data) ? data : [])
+        // a placeable [lon, lat] pair, and compactArray seals the envelope —
+        // a non-array payload or null entries degrade to an empty list
+        // instead of a 500. The max-5 cap is the service layer's, sliced
+        // once for every provider (review PR #80).
+        return compactArray(data)
             .map((result) => ({
                 coordinates: [parseFloat(result.lon), parseFloat(result.lat)],
                 displayName: result.display_name,

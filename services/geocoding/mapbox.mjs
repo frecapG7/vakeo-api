@@ -1,4 +1,5 @@
 import { GEOCODE_MAX_RESULTS } from "../../utils/constants.mjs";
+import { compactArray } from "../../utils/validator.mjs";
 
 const ENDPOINT = "https://api.mapbox.com/search/geocode/v6/forward";
 const TIMEOUT_MS = 5000;
@@ -29,11 +30,11 @@ export const geocode = async (address) => {
 
     const data = await response.json();
     // Every match must be placeable: features without a usable [lon, lat]
-    // pair are dropped rather than returned with empty coordinates.
-    // Array.isArray guards a 200 payload where features is not an array.
-    // The max-5 cap is not applied here: the service layer slices once for
-    // every provider (review PR #80).
-    return (Array.isArray(data?.features) ? data.features : [])
+    // pair are dropped rather than returned with empty coordinates, and
+    // compactArray seals the envelope — a non-array features field or null
+    // entries degrade to an empty list instead of a 500. The max-5 cap is
+    // the service layer's, sliced once for every provider (review PR #80).
+    return compactArray(data?.features)
         .filter((feature) => (feature.geometry?.coordinates?.length ?? 0) > 1)
         .map((feature) => ({
             coordinates: feature.geometry.coordinates,

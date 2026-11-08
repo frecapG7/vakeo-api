@@ -95,6 +95,21 @@ describe("geocode (mapbox provider, default)", () => {
         ]);
     });
 
+    test("drops null entries inside the features array instead of crashing", async () => {
+        jest.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+            mapboxResponse([
+                null,
+                { geometry: { coordinates: [-1.5536, 47.2184] }, properties: { full_address: "Nantes, France" } },
+            ])
+        );
+
+        const result = await geocode("Atlantis");
+
+        expect(result).toEqual([
+            { coordinates: [-1.5536, 47.2184], displayName: "Nantes, France", provider: "mapbox" },
+        ]);
+    });
+
     test("returns an empty list when the provider finds nothing", async () => {
         jest.spyOn(globalThis, "fetch").mockResolvedValueOnce(mapboxResponse([]));
 
@@ -252,6 +267,23 @@ describe("geocode (nominatim provider, opt-in)", () => {
             { coordinates: [-1.6805, 48.1119], displayName: "Ville 2, France", provider: "nominatim" },
             { coordinates: [-1.6805, 48.1119], displayName: "Ville 3, France", provider: "nominatim" },
             { coordinates: [-1.6805, 48.1119], displayName: "Ville 4, France", provider: "nominatim" },
+        ]);
+    });
+
+    test("drops null entries in the response array instead of crashing", async () => {
+        setGeocodingProvider("nominatim");
+        jest.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+            ok: true,
+            json: async () => [
+                null,
+                { lat: "48.1119", lon: "-1.6805", display_name: "Rennes, France" },
+            ],
+        });
+
+        const result = await geocode("Rennes-on-sea");
+
+        expect(result).toEqual([
+            { coordinates: [-1.6805, 48.1119], displayName: "Rennes, France", provider: "nominatim" },
         ]);
     });
 });
