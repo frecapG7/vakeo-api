@@ -1,4 +1,4 @@
-
+import { GEOCODE_MAX_RESULTS } from "../../utils/constants.mjs";
 
 const headers = new Headers({
     // "Accept"       : "application/json",
@@ -6,14 +6,12 @@ const headers = new Headers({
     "User-Agent"   : "VAKEO/v1"
 })
 
-const MAX_RESULTS = 5;
-
 export const geocode = async (address) => {
     try {
         const url = new URL('https://nominatim.openstreetmap.org/search');
         url.searchParams.append('q', address);
         url.searchParams.append('format', 'json');
-        url.searchParams.append('limit', String(MAX_RESULTS));
+        url.searchParams.append('limit', String(GEOCODE_MAX_RESULTS));
         // url.searchParams.append('polygon_svg', '1');
 
         const response = await fetch(url, {
@@ -22,8 +20,8 @@ export const geocode = async (address) => {
         });
         const data = await response.json();
         // Same invariant as the mapbox provider: every returned match carries
-        // a placeable [lon, lat] pair, and the list is capped here rather than
-        // trusting the provider's limit parameter alone.
+        // a placeable [lon, lat] pair. The max-5 cap is not applied here:
+        // the service layer slices once for every provider (review PR #80).
         return (Array.isArray(data) ? data : [])
             .map((result) => ({
                 coordinates: [parseFloat(result.lon), parseFloat(result.lat)],
@@ -31,8 +29,7 @@ export const geocode = async (address) => {
                 provider: 'nominatim',
             }))
             .filter((result) =>
-                Number.isFinite(result.coordinates[0]) && Number.isFinite(result.coordinates[1]))
-            .slice(0, MAX_RESULTS);
+                Number.isFinite(result.coordinates[0]) && Number.isFinite(result.coordinates[1]));
     } catch (error) {
         console.error("Nominatim request error:", error.message);
         throw error;

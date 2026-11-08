@@ -103,6 +103,17 @@ describe("geocode (mapbox provider, default)", () => {
         expect(result).toEqual([]);
     });
 
+    test("returns an empty list when the payload features field is not an array", async () => {
+        jest.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({ features: "unexpected" }),
+        });
+
+        const result = await geocode("Paradise City");
+
+        expect(result).toEqual([]);
+    });
+
     test("surfaces provider HTTP failures", async () => {
         jest.spyOn(globalThis, "fetch").mockResolvedValueOnce({
             ok: false,
