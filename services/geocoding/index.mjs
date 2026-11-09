@@ -1,6 +1,7 @@
 import { geocode as nominatimGeocode } from "./nominatim.mjs";
 import { geocode as mapboxGeocode } from "./mapbox.mjs";
 import { InvalidError, ServiceUnavailableError } from "../../utils/errors.mjs";
+import { GEOCODE_MAX_RESULTS } from "../../utils/constants.mjs";
 
 
 const MAX_ADDRESS_LENGTH = 300;
@@ -30,7 +31,7 @@ export const setGeocodingProvider = (name) => {
 
 
 const cacheResult = (key, result) => {
-    if (!Array.isArray(result.coordinates) || result.coordinates.length === 0)
+    if (!Array.isArray(result) || result.length === 0)
         return;
 
     if (cache.size >= CACHE_MAX_ENTRIES) {
@@ -71,8 +72,13 @@ export const geocode = async (address) => {
 
     const promise = provider(normalized)
         .then((result) => {
-            cacheResult(normalized, result);
-            return result;
+            // The max-5 contract is enforced once in the service layer, after
+            // the provider call (review PR #80): the cached list matches the
+            // capped shape and a provider that forgets the cap cannot break
+            // the documented response.
+            const capped = result.slice(0, GEOCODE_MAX_RESULTS);
+            cacheResult(normalized, capped);
+            return capped;
         });
 
     inFlight.set(normalized, promise);

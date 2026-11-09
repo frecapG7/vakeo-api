@@ -1,3 +1,6 @@
+import { GEOCODE_MAX_RESULTS } from "../../utils/constants.mjs";
+import { compactArray } from "../../utils/validator.mjs";
+
 const ENDPOINT = "https://api.mapbox.com/search/geocode/v6/forward";
 const TIMEOUT_MS = 5000;
 
@@ -9,7 +12,7 @@ export const geocode = async (address) => {
 
     const url = new URL(ENDPOINT);
     url.searchParams.append("q", address);
-    url.searchParams.append("limit", "1");
+    url.searchParams.append("limit", String(GEOCODE_MAX_RESULTS));
     url.searchParams.append("access_token", token);
 
     let response;
@@ -26,18 +29,18 @@ export const geocode = async (address) => {
         throw new Error(`Mapbox request failed with status ${response.status}`);
 
     const data = await response.json();
-    const feature = data.features?.[0];
-    if (!feature) {
-        return {
-            coordinates: [],
-            displayName: "No results",
+    // Every match must be placeable: features without a usable [lon, lat]
+    // pair are dropped rather than returned with empty coordinates, and
+    // compactArray seals the envelope — a non-array features field or null
+    // entries degrade to an empty list instead of a 500. The max-5 cap is
+    // the service layer's, sliced once for every provider (review PR #80).
+    return compactArray(data?.features)
+        .filter((feature) => (feature.geometry?.coordinates?.length ?? 0) > 1)
+        .map((feature) => ({
+            coordinates: feature.geometry.coordinates,
+            displayName: feature.properties?.full_address ?? address,
             provider: "mapbox",
-        };
-    }
-
-    return {
-        coordinates: feature.geometry?.coordinates ?? [],
-        displayName: feature.properties?.full_address ?? address,
-        provider: "mapbox",
-    };
+        }))
+        .filter((result) =>
+                Number.isFinite(result.coordinates[0]) && Number.isFinite(result.coordinates[1]));
 };

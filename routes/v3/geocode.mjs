@@ -20,7 +20,9 @@ const geocodeLimiter = rateLimit({
  * per-IP limit. Validation, provider selection and caching live in the
  * service; business errors surface as 422 via the error middleware.
  * @body {string} address - free-form address to geocode
- * @returns {object} - { success, data: { coordinates, displayName, provider } }
+ * @returns {object} - { success, data: [{ coordinates, displayName, provider }] }
+ *   Up to 5 candidates ranked by the provider, coordinates in GeoJSON order
+ *   ([longitude, latitude]); an empty data array means no candidate was found.
  */
 app.post("/geocode", geocodeLimiter, async (req, res) => {
     const result = await geocode(req.body?.address);
