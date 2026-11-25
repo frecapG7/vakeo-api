@@ -5,6 +5,7 @@ import {
     addReaction, removeReaction,
 } from "../../services/messageService.mjs";
 import { loadTripContext } from "../../services/tripContextService.mjs";
+import { reportMessage } from "../../services/messageReportService.mjs";
 import { requireMembership, requireReadAccess } from "../../services/validationService.mjs";
 import { auth, optionalAuth } from "./auth.mjs";
 import { buildNextCursor, sanitizeLimit } from "../../utils/pagination.mjs";
@@ -20,7 +21,7 @@ app.get("/trips/:tripId/messages", optionalAuth, async (req, res) => {
     const { rawId } = await loadTripContext(req, requireReadAccess);
     const { cursor, limit = 10 } = req.query;
     const sanitizedLimit = sanitizeLimit(limit);
-    const messages = await search(rawId, cursor, sanitizedLimit);
+    const messages = await search(rawId, cursor, sanitizedLimit, undefined, req.user?._id || null);
     const nextCursor = buildNextCursor(messages, sanitizedLimit, ['_id', 'createdAt']);
     return res.status(200).json({ nextCursor, totalResults: messages?.length, messages });
 });
@@ -32,7 +33,7 @@ app.get("/trips/:tripId/messages/general", optionalAuth, async (req, res) => {
     const { rawId } = await loadTripContext(req, requireReadAccess);
     const { cursor, limit = 10 } = req.query;
     const sanitizedLimit = sanitizeLimit(limit);
-    const messages = await search(rawId, cursor, sanitizedLimit, null);
+    const messages = await search(rawId, cursor, sanitizedLimit, null, req.user?._id || null);
     const nextCursor = buildNextCursor(messages, sanitizedLimit, ['_id', 'createdAt']);
     return res.status(200).json({ nextCursor, totalResults: messages?.length, messages });
 });
@@ -44,7 +45,7 @@ app.get("/trips/:tripId/events/:eventId/messages", optionalAuth, async (req, res
     const { rawId } = await loadTripContext(req, requireReadAccess);
     const { cursor, limit = 10 } = req.query;
     const sanitizedLimit = sanitizeLimit(limit);
-    const messages = await search(rawId, cursor, sanitizedLimit, req.params.eventId);
+    const messages = await search(rawId, cursor, sanitizedLimit, req.params.eventId, req.user?._id || null);
     const nextCursor = buildNextCursor(messages, sanitizedLimit, ['_id', 'createdAt']);
     return res.status(200).json({ nextCursor, totalResults: messages?.length, messages });
 });
@@ -103,6 +104,19 @@ app.delete("/trips/:tripId/messages/:messageId/reactions", auth, async (req, res
     const { rawId } = await loadTripContext(req, requireMembership);
     const reactions = await removeReaction(rawId, req.params.messageId, req.user._id, req.body?.emoji ?? req.query?.emoji);
     return res.status(200).json({ reactions });
+});
+
+/**
+ * POST /trips/:tripId/messages/:messageId/reports — report a message (member only).
+ * Body: { reason, comment? } — reason must be one of MESSAGE_REPORT_REASONS
+ * (messageReportService), comment is optional free text (≤ 500 chars).
+ * Idempotent per reporter: 201 on a fresh report, 200 with
+ * `alreadyReported: true` when this member already reported the message.
+ */
+app.post("/trips/:tripId/messages/:messageId/reports", auth, async (req, res) => {
+    const { rawId } = await loadTripContext(req, requireMembership);
+    const { report, alreadyReported } = await reportMessage(rawId, req.params.messageId, req.user._id, req.body);
+    return res.status(alreadyReported ? 200 : 201).json({ report, alreadyReported });
 });
 
 /**
