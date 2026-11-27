@@ -157,6 +157,16 @@ describe("contentReportService — seat channel", () => {
         expect(mockMessage.findOne).not.toHaveBeenCalled();
     });
 
+    test("a non-string subject id surfaces 404 without touching the DB", async () => {
+        // A JSON body can carry 123, true or an object: the string guard keeps
+        // the CastError (500) out of reach, whatever bson's isValid() accepts.
+        for (const subjectId of [123, true, { $ne: null }]) {
+            await expect(reportContent("trip123", "member1", { subjectType: "message", subjectId, reason: "spam" }))
+                .rejects.toThrow(NotFoundError);
+        }
+        expect(mockMessage.findOne).not.toHaveBeenCalled();
+    });
+
     test("a second report returns the existing one (unique index fallback)", async () => {
         mockMessage.findOne.mockResolvedValueOnce({ _id: SUBJECT_ID, text: "spam", user: "author1" });
         mockContentReport.create.mockRejectedValueOnce(Object.assign(new Error("duplicate key"), { code: 11000 }));
@@ -211,6 +221,15 @@ describe("contentReportService — public channel", () => {
         await expect(reportContentAnonymously({ subjectType: "message", subjectId: "not-an-id", reason: "spam" }))
             .resolves.toEqual({ received: true });
         expect(mockMessage.findOne).not.toHaveBeenCalled();
+    });
+
+    test("a non-string subject id stays a uniform 202, without a DB query", async () => {
+        for (const subjectId of [123, true, { $ne: null }]) {
+            await expect(reportContentAnonymously({ subjectType: "message", subjectId, reason: "spam" }))
+                .resolves.toEqual({ received: true });
+        }
+        expect(mockMessage.findOne).not.toHaveBeenCalled();
+        expect(mockContentReport.create).not.toHaveBeenCalled();
     });
 
     test("a seat cannot be resolved without a trip context: silently dropped", async () => {

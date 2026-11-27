@@ -97,6 +97,15 @@ const assertValidReason = (reason) => {
         throw new InvalidError(`Reason must be one of: ${CONTENT_REPORT_REASONS.join(", ")}`);
 };
 
+/**
+ * A JSON body can carry anything. bson's ObjectId.isValid() has historically
+ * accepted non-strings (numbers and booleans up to bson 4), and any value that
+ * slips through reaches Model.findOne() and throws a CastError — a 500 that
+ * breaks the uniform-202 contract of the public channel. Requiring a string
+ * keeps that contract independent of the bson version.
+ */
+const isObjectIdString = (value) => typeof value === "string" && mongoose.Types.ObjectId.isValid(value);
+
 // Optional free-text: trimmed, nulled when empty, capped at COMMENT_MAX_LENGTH.
 const normalizeComment = (comment) => {
     if (comment === undefined || comment === null)
@@ -171,7 +180,7 @@ export const reportContent = async (tripId, reporterId, { subjectType, subjectId
     assertValidReason(reason);
     const normalizedComment = normalizeComment(comment);
 
-    if (!mongoose.Types.ObjectId.isValid(subjectId))
+    if (!isObjectIdString(subjectId))
         throw new NotFoundError(`${subjectType} ${subjectId} not found`);
 
     const subject = await loadSubject(subjectType, subjectId, tripId);
@@ -216,7 +225,7 @@ export const reportContentAnonymously = async ({ subjectType, subjectId, reason,
     assertValidReason(reason);
     const normalizedComment = normalizeComment(comment);
 
-    if (!mongoose.Types.ObjectId.isValid(subjectId))
+    if (!isObjectIdString(subjectId))
         return { received: true };
 
     const subject = await loadSubject(subjectType, subjectId);
