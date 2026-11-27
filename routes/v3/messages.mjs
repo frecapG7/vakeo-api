@@ -20,7 +20,7 @@ app.get("/trips/:tripId/messages", optionalAuth, async (req, res) => {
     const { rawId } = await loadTripContext(req, requireReadAccess);
     const { cursor, limit = 10 } = req.query;
     const sanitizedLimit = sanitizeLimit(limit);
-    const messages = await search(rawId, cursor, sanitizedLimit);
+    const messages = await search(rawId, cursor, sanitizedLimit, undefined, req.user?._id || null);
     const nextCursor = buildNextCursor(messages, sanitizedLimit, ['_id', 'createdAt']);
     return res.status(200).json({ nextCursor, totalResults: messages?.length, messages });
 });
@@ -32,7 +32,7 @@ app.get("/trips/:tripId/messages/general", optionalAuth, async (req, res) => {
     const { rawId } = await loadTripContext(req, requireReadAccess);
     const { cursor, limit = 10 } = req.query;
     const sanitizedLimit = sanitizeLimit(limit);
-    const messages = await search(rawId, cursor, sanitizedLimit, null);
+    const messages = await search(rawId, cursor, sanitizedLimit, null, req.user?._id || null);
     const nextCursor = buildNextCursor(messages, sanitizedLimit, ['_id', 'createdAt']);
     return res.status(200).json({ nextCursor, totalResults: messages?.length, messages });
 });
@@ -44,7 +44,7 @@ app.get("/trips/:tripId/events/:eventId/messages", optionalAuth, async (req, res
     const { rawId } = await loadTripContext(req, requireReadAccess);
     const { cursor, limit = 10 } = req.query;
     const sanitizedLimit = sanitizeLimit(limit);
-    const messages = await search(rawId, cursor, sanitizedLimit, req.params.eventId);
+    const messages = await search(rawId, cursor, sanitizedLimit, req.params.eventId, req.user?._id || null);
     const nextCursor = buildNextCursor(messages, sanitizedLimit, ['_id', 'createdAt']);
     return res.status(200).json({ nextCursor, totalResults: messages?.length, messages });
 });

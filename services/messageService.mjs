@@ -3,6 +3,7 @@ import Message from "../models/messageModel.mjs";
 import Event from "../models/eventModel.mjs";
 import { InvalidError, NotFoundError } from "../utils/errors.mjs";
 import { readCursor } from "../utils/pagination.mjs";
+import { getReportedSubjectIds } from "./contentReportService.mjs";
 
 export const createMessage = async (trip, { text = "", user, event = null }) => {
     // Validate event belongs to trip if provided
@@ -23,7 +24,7 @@ export const createMessage = async (trip, { text = "", user, event = null }) => 
     return await message.save();
 }
 
-export const search = async (tripId, cursor, limit, eventId = null) => {
+export const search = async (tripId, cursor, limit, eventId = null, viewerId = null) => {
     let query = {
         trip: tripId,
         event: eventId
@@ -52,7 +53,15 @@ export const search = async (tripId, cursor, limit, eventId = null) => {
         }
     }).populate("user", "name avatar");
 
-    return messages;
+    if (!viewerId) return messages;
+
+    // `reportedByMe` drives the anti-doublon state on the client. The reports
+    // live in their own collection, so it costs one indexed query per listing.
+    const reportedIds = await getReportedSubjectIds(tripId, viewerId, "message", messages.map((message) => message._id));
+    return messages.map((message) => ({
+        ...message.toObject(),
+        reportedByMe: reportedIds.has(String(message._id))
+    }));
 }
 
 
