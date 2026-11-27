@@ -382,9 +382,8 @@ describe("v3 message reactions", () => {
 describe("v3 content reports", () => {
     const encoded = encodeId("trip123");
     const genericUrl = () => `${baseUrl}/trips/${encoded}/reports`;
-    const reportsUrl = (messageId = "msg1") => `${baseUrl}/trips/${encoded}/messages/${messageId}/reports`;
 
-    test("member can report a message through the message alias (201)", async () => {
+    test("member can report a message (201, report returned)", async () => {
         mockTripUserService.getTripUserByToken.mockResolvedValueOnce(memberUser);
         mockTripService.getTrip.mockResolvedValueOnce(fakeTrip());
         mockContentReportService.reportContent.mockResolvedValueOnce({
@@ -392,17 +391,16 @@ describe("v3 content reports", () => {
             alreadyReported: false,
         });
 
-        const res = await fetch(reportsUrl(), {
+        const res = await fetch(genericUrl(), {
             method: "POST",
             headers: { "Content-Type": "application/json", "x-user-token": "tok-alice" },
-            body: JSON.stringify({ reason: "spam", comment: "insultes repetees" }),
+            body: JSON.stringify({ subjectType: "message", subjectId: "msg1", reason: "spam", comment: "insultes repetees" }),
         });
 
         expect(res.status).toBe(201);
         const body = await res.json();
         expect(body.alreadyReported).toBe(false);
         expect(body.report.reason).toBe("spam");
-        // The alias fills subjectType itself: a chat client never names subject types.
         expect(mockContentReportService.reportContent).toHaveBeenCalledWith("trip123", "member1", {
             subjectType: "message",
             subjectId: "msg1",
@@ -411,7 +409,7 @@ describe("v3 content reports", () => {
         });
     });
 
-    test("member can report any other subject type through the generic route (201)", async () => {
+    test("member can report another subject type (event, 201)", async () => {
         mockTripUserService.getTripUserByToken.mockResolvedValueOnce(memberUser);
         mockTripService.getTrip.mockResolvedValueOnce(fakeTrip());
         mockContentReportService.reportContent.mockResolvedValueOnce({
@@ -442,10 +440,10 @@ describe("v3 content reports", () => {
             alreadyReported: true,
         });
 
-        const res = await fetch(reportsUrl(), {
+        const res = await fetch(genericUrl(), {
             method: "POST",
             headers: { "Content-Type": "application/json", "x-user-token": "tok-alice" },
-            body: JSON.stringify({ reason: "spam" }),
+            body: JSON.stringify({ subjectType: "message", subjectId: "msg1", reason: "spam" }),
         });
 
         expect(res.status).toBe(200);
@@ -453,10 +451,10 @@ describe("v3 content reports", () => {
     });
 
     test("anonymous gets 401 on reports", async () => {
-        const res = await fetch(reportsUrl(), {
+        const res = await fetch(genericUrl(), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ reason: "spam" }),
+            body: JSON.stringify({ subjectType: "message", subjectId: "msg1", reason: "spam" }),
         });
         expect(res.status).toBe(401);
     });
@@ -465,10 +463,10 @@ describe("v3 content reports", () => {
         mockTripUserService.getTripUserByToken.mockResolvedValueOnce(strangerUser);
         mockTripService.getTrip.mockResolvedValueOnce(fakeTrip());
 
-        const res = await fetch(reportsUrl(), {
+        const res = await fetch(genericUrl(), {
             method: "POST",
             headers: { "Content-Type": "application/json", "x-user-token": "tok-stranger" },
-            body: JSON.stringify({ reason: "spam" }),
+            body: JSON.stringify({ subjectType: "message", subjectId: "msg1", reason: "spam" }),
         });
         expect(res.status).toBe(403);
     });
@@ -478,10 +476,10 @@ describe("v3 content reports", () => {
         mockTripService.getTrip.mockResolvedValueOnce(fakeTrip());
         mockContentReportService.reportContent.mockRejectedValueOnce(new InvalidError("Reason must be one of: spam, harassment, illicit, other"));
 
-        const res = await fetch(reportsUrl(), {
+        const res = await fetch(genericUrl(), {
             method: "POST",
             headers: { "Content-Type": "application/json", "x-user-token": "tok-alice" },
-            body: JSON.stringify({ reason: "boring" }),
+            body: JSON.stringify({ subjectType: "message", subjectId: "msg1", reason: "boring" }),
         });
         expect(res.status).toBe(422);
     });
@@ -491,23 +489,23 @@ describe("v3 content reports", () => {
         mockTripService.getTrip.mockResolvedValueOnce(fakeTrip());
         mockContentReportService.reportContent.mockRejectedValueOnce(new NotFoundError("Message msgX not found"));
 
-        const res = await fetch(reportsUrl("msgX"), {
+        const res = await fetch(genericUrl(), {
             method: "POST",
             headers: { "Content-Type": "application/json", "x-user-token": "tok-alice" },
-            body: JSON.stringify({ reason: "spam" }),
+            body: JSON.stringify({ subjectType: "message", subjectId: "msgX", reason: "spam" }),
         });
         expect(res.status).toBe(404);
     });
 
-    test("reporting your own message surfaces 403", async () => {
+    test("reporting your own content surfaces 403", async () => {
         mockTripUserService.getTripUserByToken.mockResolvedValueOnce(memberUser);
         mockTripService.getTrip.mockResolvedValueOnce(fakeTrip());
-        mockContentReportService.reportContent.mockRejectedValueOnce(new ForbiddenError("You cannot report your own message"));
+        mockContentReportService.reportContent.mockRejectedValueOnce(new ForbiddenError("You cannot report your own content"));
 
-        const res = await fetch(reportsUrl(), {
+        const res = await fetch(genericUrl(), {
             method: "POST",
             headers: { "Content-Type": "application/json", "x-user-token": "tok-alice" },
-            body: JSON.stringify({ reason: "spam" }),
+            body: JSON.stringify({ subjectType: "message", subjectId: "msg1", reason: "spam" }),
         });
         expect(res.status).toBe(403);
     });

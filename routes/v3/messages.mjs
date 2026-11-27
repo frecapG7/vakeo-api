@@ -5,7 +5,6 @@ import {
     addReaction, removeReaction,
 } from "../../services/messageService.mjs";
 import { loadTripContext } from "../../services/tripContextService.mjs";
-import { reportContent } from "../../services/contentReportService.mjs";
 import { requireMembership, requireReadAccess } from "../../services/validationService.mjs";
 import { auth, optionalAuth } from "./auth.mjs";
 import { buildNextCursor, sanitizeLimit } from "../../utils/pagination.mjs";
@@ -104,24 +103,6 @@ app.delete("/trips/:tripId/messages/:messageId/reactions", auth, async (req, res
     const { rawId } = await loadTripContext(req, requireMembership);
     const reactions = await removeReaction(rawId, req.params.messageId, req.user._id, req.body?.emoji ?? req.query?.emoji);
     return res.status(200).json({ reactions });
-});
-
-/**
- * POST /trips/:tripId/messages/:messageId/reports — report a message (member only).
- * Convenience alias of POST /trips/:tripId/reports with subjectType "message",
- * so a chat client never needs to know the subject types. Body: { reason,
- * comment? } — reason must be one of CONTENT_REPORT_REASONS (contentReportService).
- * Idempotent per reporter: 201 on a fresh report, 200 with `alreadyReported: true`.
- */
-app.post("/trips/:tripId/messages/:messageId/reports", auth, async (req, res) => {
-    const { rawId } = await loadTripContext(req, requireMembership);
-    const { report, alreadyReported } = await reportContent(rawId, req.user._id, {
-        subjectType: "message",
-        subjectId: req.params.messageId,
-        reason: req.body?.reason,
-        comment: req.body?.comment
-    });
-    return res.status(alreadyReported ? 200 : 201).json({ report, alreadyReported });
 });
 
 /**
