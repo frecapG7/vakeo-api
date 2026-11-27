@@ -1,4 +1,5 @@
 import { jest } from "@jest/globals";
+import { NotFoundError } from "../../utils/errors.mjs";
 
 // --- Mock the DB-dependent services ---
 // Every named export the v3 events route graph imports must be present here:
@@ -81,7 +82,9 @@ afterAll(async () => {
 });
 
 beforeEach(() => {
-    jest.clearAllMocks();
+    // resetAllMocks, not clearAllMocks: clear only wipes call history, so a
+    // mockResolvedValue left by a previous test would leak into the next one.
+    jest.resetAllMocks();
     mockTripService.getTrip.mockResolvedValue(fakeTrip());
     // Identity by default: the counting layer is transparent for the delegation
     // and access tests, and asserted on its own in the counts block below.
@@ -289,6 +292,7 @@ describe("v3 events — counts", () => {
         const res = await fetch(`${baseUrl}/trips/${encoded}/events`);
         const body = await res.json();
 
+        expect(body.totalResults).toBe(2);
         expect(body.events[0].messageCount).toBe(12);
         expect(body.events[0].goodsCount).toEqual({ total: 8, missing: 3 });
         expect(body.events[1].lastMessageAt).toBeNull();
@@ -334,5 +338,14 @@ describe("v3 events — counts", () => {
         expect(res.status).toBe(200);
         expect(mockEventsService.withEventCount).not.toHaveBeenCalled();
         expect(mockEventsService.withEventCounts).not.toHaveBeenCalled();
+    });
+
+    test("detail: a missing event 404s and the counting layer is never called", async () => {
+        mockEventsService.getEvent.mockRejectedValue(new NotFoundError("Cannot find event"));
+
+        const res = await fetch(`${baseUrl}/trips/${encoded}/events/unknown`);
+
+        expect(res.status).toBe(404);
+        expect(mockEventsService.withEventCount).not.toHaveBeenCalled();
     });
 });
