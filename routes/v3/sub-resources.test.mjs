@@ -53,10 +53,10 @@ const mockMessageService = {
     removeReaction: jest.fn(),
 };
 
-const mockMessageReportService = {
-    reportMessage: jest.fn(),
-    reportMessageAnonymously: jest.fn(),
-    getReportedMessageIds: jest.fn(),
+const mockContentReportService = {
+    reportContent: jest.fn(),
+    reportContentAnonymously: jest.fn(),
+    getReportedSubjectIds: jest.fn(),
 };
 
 jest.unstable_mockModule("../../services/tripService.mjs", () => mockTripService);
@@ -65,7 +65,7 @@ jest.unstable_mockModule("../../services/goodsService.mjs", () => mockGoodsServi
 jest.unstable_mockModule("../../services/pollsService.mjs", () => mockPollsService);
 jest.unstable_mockModule("../../services/tripUserService.mjs", () => mockTripUserService);
 jest.unstable_mockModule("../../services/messageService.mjs", () => mockMessageService);
-jest.unstable_mockModule("../../services/messageReportService.mjs", () => mockMessageReportService);
+jest.unstable_mockModule("../../services/contentReportService.mjs", () => mockContentReportService);
 
 const { encodeId } = await import("../../services/idEncoderService.mjs");
 
@@ -102,13 +102,13 @@ beforeAll(async () => {
     const polls = (await import("./polls.mjs")).default;
 
     const messages = (await import("./messages.mjs")).default;
-    const messageReports = (await import("./messageReports.mjs")).default;
+    const contentReports = (await import("./contentReports.mjs")).default;
 
     app.use(tripStops);
     app.use(goods);
     app.use(polls);
     app.use(messages);
-    app.use(messageReports);
+    app.use(contentReports);
     app.use(handleError);
 
     server = app.listen(0);
@@ -378,15 +378,16 @@ describe("v3 message reactions", () => {
     });
 });
 
-// --- Messages: reports ---
-describe("v3 message reports", () => {
+// --- Content reports ---
+describe("v3 content reports", () => {
     const encoded = encodeId("trip123");
+    const genericUrl = () => `${baseUrl}/trips/${encoded}/reports`;
     const reportsUrl = (messageId = "msg1") => `${baseUrl}/trips/${encoded}/messages/${messageId}/reports`;
 
-    test("member can report a message (201, report returned)", async () => {
+    test("member can report a message through the message alias (201)", async () => {
         mockTripUserService.getTripUserByToken.mockResolvedValueOnce(memberUser);
         mockTripService.getTrip.mockResolvedValueOnce(fakeTrip());
-        mockMessageReportService.reportMessage.mockResolvedValueOnce({
+        mockContentReportService.reportContent.mockResolvedValueOnce({
             report: { _id: "report1", reason: "spam", status: "pending" },
             alreadyReported: false,
         });
@@ -401,15 +402,42 @@ describe("v3 message reports", () => {
         const body = await res.json();
         expect(body.alreadyReported).toBe(false);
         expect(body.report.reason).toBe("spam");
-        expect(mockMessageReportService.reportMessage).toHaveBeenCalledWith(
-            "trip123", "msg1", "member1", { reason: "spam", comment: "insultes repetees" }
-        );
+        // The alias fills subjectType itself: a chat client never names subject types.
+        expect(mockContentReportService.reportContent).toHaveBeenCalledWith("trip123", "member1", {
+            subjectType: "message",
+            subjectId: "msg1",
+            reason: "spam",
+            comment: "insultes repetees",
+        });
+    });
+
+    test("member can report any other subject type through the generic route (201)", async () => {
+        mockTripUserService.getTripUserByToken.mockResolvedValueOnce(memberUser);
+        mockTripService.getTrip.mockResolvedValueOnce(fakeTrip());
+        mockContentReportService.reportContent.mockResolvedValueOnce({
+            report: { _id: "report2", reason: "illicit" },
+            alreadyReported: false,
+        });
+
+        const res = await fetch(genericUrl(), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-user-token": "tok-alice" },
+            body: JSON.stringify({ subjectType: "event", subjectId: "evt1", reason: "illicit" }),
+        });
+
+        expect(res.status).toBe(201);
+        expect(mockContentReportService.reportContent).toHaveBeenCalledWith("trip123", "member1", {
+            subjectType: "event",
+            subjectId: "evt1",
+            reason: "illicit",
+            comment: undefined,
+        });
     });
 
     test("reporting the same message twice returns 200 with alreadyReported", async () => {
         mockTripUserService.getTripUserByToken.mockResolvedValueOnce(memberUser);
         mockTripService.getTrip.mockResolvedValueOnce(fakeTrip());
-        mockMessageReportService.reportMessage.mockResolvedValueOnce({
+        mockContentReportService.reportContent.mockResolvedValueOnce({
             report: { _id: "report1", reason: "spam" },
             alreadyReported: true,
         });
@@ -448,7 +476,7 @@ describe("v3 message reports", () => {
     test("a reason outside the whitelist surfaces 422", async () => {
         mockTripUserService.getTripUserByToken.mockResolvedValueOnce(memberUser);
         mockTripService.getTrip.mockResolvedValueOnce(fakeTrip());
-        mockMessageReportService.reportMessage.mockRejectedValueOnce(new InvalidError("Reason must be one of: spam, harassment, illicit, other"));
+        mockContentReportService.reportContent.mockRejectedValueOnce(new InvalidError("Reason must be one of: spam, harassment, illicit, other"));
 
         const res = await fetch(reportsUrl(), {
             method: "POST",
@@ -461,7 +489,7 @@ describe("v3 message reports", () => {
     test("unknown message surfaces 404", async () => {
         mockTripUserService.getTripUserByToken.mockResolvedValueOnce(memberUser);
         mockTripService.getTrip.mockResolvedValueOnce(fakeTrip());
-        mockMessageReportService.reportMessage.mockRejectedValueOnce(new NotFoundError("Message msgX not found"));
+        mockContentReportService.reportContent.mockRejectedValueOnce(new NotFoundError("Message msgX not found"));
 
         const res = await fetch(reportsUrl("msgX"), {
             method: "POST",
@@ -474,7 +502,7 @@ describe("v3 message reports", () => {
     test("reporting your own message surfaces 403", async () => {
         mockTripUserService.getTripUserByToken.mockResolvedValueOnce(memberUser);
         mockTripService.getTrip.mockResolvedValueOnce(fakeTrip());
-        mockMessageReportService.reportMessage.mockRejectedValueOnce(new ForbiddenError("You cannot report your own message"));
+        mockContentReportService.reportContent.mockRejectedValueOnce(new ForbiddenError("You cannot report your own message"));
 
         const res = await fetch(reportsUrl(), {
             method: "POST",
@@ -500,23 +528,26 @@ describe("v3 message reports", () => {
     });
 
     test("public report needs no seat token (202, uniform receipt)", async () => {
-        mockMessageReportService.reportMessageAnonymously.mockResolvedValueOnce({ received: true });
+        mockContentReportService.reportContentAnonymously.mockResolvedValueOnce({ received: true });
 
         const res = await fetch(`${baseUrl}/reports`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ messageId: "msg1", reason: "illicit" }),
+            body: JSON.stringify({ subjectType: "message", subjectId: "msg1", reason: "illicit" }),
         });
 
         expect(res.status).toBe(202);
         expect((await res.json()).received).toBe(true);
-        expect(mockMessageReportService.reportMessageAnonymously).toHaveBeenCalledWith(
-            "msg1", { messageId: "msg1", reason: "illicit" }
-        );
+        expect(mockContentReportService.reportContentAnonymously).toHaveBeenCalledWith({
+            subjectType: "message",
+            subjectId: "msg1",
+            reason: "illicit",
+            comment: undefined,
+        });
     });
 
     test("public report with a reason outside the whitelist surfaces 422", async () => {
-        mockMessageReportService.reportMessageAnonymously.mockRejectedValueOnce(new InvalidError("Reason must be one of: spam, harassment, illicit, other"));
+        mockContentReportService.reportContentAnonymously.mockRejectedValueOnce(new InvalidError("Reason must be one of: spam, harassment, illicit, other"));
 
         const res = await fetch(`${baseUrl}/reports`, {
             method: "POST",

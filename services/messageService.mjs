@@ -3,7 +3,7 @@ import Message from "../models/messageModel.mjs";
 import Event from "../models/eventModel.mjs";
 import { InvalidError, NotFoundError } from "../utils/errors.mjs";
 import { readCursor } from "../utils/pagination.mjs";
-import { getReportedMessageIds } from "./messageReportService.mjs";
+import { getReportedSubjectIds } from "./contentReportService.mjs";
 
 export const createMessage = async (trip, { text = "", user, event = null }) => {
     // Validate event belongs to trip if provided
@@ -57,7 +57,7 @@ export const search = async (tripId, cursor, limit, eventId = null, viewerId = n
 
     // `reportedByMe` drives the anti-doublon state on the client. The reports
     // live in their own collection, so it costs one indexed query per listing.
-    const reportedIds = await getReportedMessageIds(tripId, viewerId, messages.map((message) => message._id));
+    const reportedIds = await getReportedSubjectIds(tripId, viewerId, "message", messages.map((message) => message._id));
     return messages.map((message) => ({
         ...message.toObject(),
         reportedByMe: reportedIds.has(String(message._id))
