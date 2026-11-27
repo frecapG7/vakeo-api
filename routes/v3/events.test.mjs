@@ -16,6 +16,8 @@ const mockEventsService = {
     getEvent: jest.fn(),
     createEvent: jest.fn(),
     updateEvent: jest.fn(),
+    withEventCounts: jest.fn(),
+    withEventCount: jest.fn(),
 };
 
 jest.unstable_mockModule("../../services/tripService.mjs", () => mockTripService);
@@ -81,6 +83,10 @@ afterAll(async () => {
 beforeEach(() => {
     jest.clearAllMocks();
     mockTripService.getTrip.mockResolvedValue(fakeTrip());
+    // Identity by default: the counting layer is transparent for the delegation
+    // and access tests, and asserted on its own in the counts block below.
+    mockEventsService.withEventCounts.mockImplementation(async (tripId, events) => events ?? []);
+    mockEventsService.withEventCount.mockImplementation(async (tripId, event) => event);
 });
 
 describe("v3 events — access", () => {
@@ -264,5 +270,69 @@ describe("v3 events — delegation", () => {
         });
 
         expect(res.status).toBe(501);
+    });
+});
+
+describe("v3 events — counts", () => {
+    test("list: every event carries its counts", async () => {
+        mockEventsService.search.mockResolvedValue([{ _id: "evt1" }, { _id: "evt2" }]);
+        mockEventsService.withEventCounts.mockResolvedValue([
+            {
+                _id: "evt1",
+                messageCount: 12,
+                lastMessageAt: "2026-01-02T10:00:00.000Z",
+                goodsCount: { total: 8, missing: 3 },
+            },
+            { _id: "evt2", messageCount: 0, lastMessageAt: null, goodsCount: { total: 0, missing: 0 } },
+        ]);
+
+        const res = await fetch(`${baseUrl}/trips/${encoded}/events`);
+        const body = await res.json();
+
+        expect(body.events[0].messageCount).toBe(12);
+        expect(body.events[0].goodsCount).toEqual({ total: 8, missing: 3 });
+        expect(body.events[1].lastMessageAt).toBeNull();
+        expect(body.events[1].goodsCount).toEqual({ total: 0, missing: 0 });
+        expect(mockEventsService.withEventCounts).toHaveBeenCalledWith("trip123", [
+            { _id: "evt1" },
+            { _id: "evt2" },
+        ]);
+    });
+
+    test("detail: counts are attached to the returned event", async () => {
+        const storedEvent = { _id: "evt1", name: "Dîner" };
+        mockEventsService.getEvent.mockResolvedValue(storedEvent);
+        mockEventsService.withEventCount.mockResolvedValue({
+            ...storedEvent,
+            messageCount: 2,
+            lastMessageAt: null,
+            goodsCount: { total: 1, missing: 1 },
+        });
+
+        const res = await fetch(`${baseUrl}/trips/${encoded}/events/evt1`);
+        const body = await res.json();
+
+        expect(body.messageCount).toBe(2);
+        expect(body.goodsCount).toEqual({ total: 1, missing: 1 });
+        expect(mockEventsService.withEventCount).toHaveBeenCalledWith("trip123", storedEvent);
+    });
+
+    test("update: the mutation path never goes through the counting layer", async () => {
+        authenticateAs(memberUser);
+        mockEventsService.getEvent.mockResolvedValue({ _id: "evt1" });
+        mockEventsService.updateEvent.mockResolvedValue({ _id: "evt1", name: "Brunch" });
+
+        const res = await fetch(`${baseUrl}/trips/${encoded}/events/evt1`, {
+            method: "PUT",
+            headers: {
+                "content-type": "application/json",
+                "x-user-token": memberUser.token,
+            },
+            body: JSON.stringify({ name: "Brunch" }),
+        });
+
+        expect(res.status).toBe(200);
+        expect(mockEventsService.withEventCount).not.toHaveBeenCalled();
+        expect(mockEventsService.withEventCounts).not.toHaveBeenCalled();
     });
 });

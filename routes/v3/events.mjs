@@ -1,5 +1,5 @@
 import express from "express";
-import { createEvent, getEvent, search, updateEvent } from "../../services/eventsService.mjs";
+import { createEvent, getEvent, search, updateEvent, withEventCount, withEventCounts } from "../../services/eventsService.mjs";
 import { loadTripContext } from "../../services/tripContextService.mjs";
 import { requireMembership, requireReadAccess } from "../../services/validationService.mjs";
 import { auth, optionalAuth } from "./auth.mjs";
@@ -16,10 +16,11 @@ app.get("/trips/:tripId/events", optionalAuth, async (req, res) => {
     const { rawId } = await loadTripContext(req, requireReadAccess);
     const sanitizedLimit = sanitizeLimit(req?.query?.limit);
     const events = await search(rawId, { ...req?.query, limit: sanitizedLimit });
+    const eventsWithCounts = await withEventCounts(rawId, events);
 
-    const nextCursor = buildNextCursor(events, sanitizedLimit, ['_id', 'startDate']);
+    const nextCursor = buildNextCursor(eventsWithCounts, sanitizedLimit, ['_id', 'startDate']);
 
-    return res.status(200).json({ nextCursor, totalResults: events?.length, events });
+    return res.status(200).json({ nextCursor, totalResults: eventsWithCounts?.length, events: eventsWithCounts });
 });
 
 /**
@@ -28,7 +29,8 @@ app.get("/trips/:tripId/events", optionalAuth, async (req, res) => {
 app.get("/trips/:tripId/events/:eventId", optionalAuth, async (req, res) => {
     const { rawId } = await loadTripContext(req, requireReadAccess);
     const event = await getEvent(rawId, req.params.eventId);
-    return res.status(200).json(event);
+    const eventWithCounts = await withEventCount(rawId, event);
+    return res.status(200).json(eventWithCounts);
 });
 
 /**

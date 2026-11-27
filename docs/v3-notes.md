@@ -63,8 +63,19 @@ Notes de contexte pour travailler sur l'API v3. Fichier maintenu à la main — 
 
 - Pattern standard pour toute route v3 scopée sur un trip : `const { rawId, trip } = await loadTripContext(req, requireReadAccess)` en première ligne du handler (`services/tripContextService.mjs`). Résout l'id chiffré, charge le trip, applique le garde (`requireReadAccess` ou `requireMembership` de `validationService`), retourne `{ rawId, trip }`. Erreurs : `InvalidError` (id altéré, 422), trip introuvable (404), `ForbiddenError` (403).
 - Garde passé explicitement en paramètre (choix délibéré vs middleware `req.tripContext`) : une route de lecture sans garde saute aux yeux au review au lieu d'être silencieusement publique.
-- Migrations opportunistes restantes (prélude manuel `resolveEncodedTripId` + `getTrip` + garde, à remplacer au passage quand on touche le fichier) : `routes/v3/events.mjs`, `goods.mjs`, `links.mjs`, `polls.mjs`, `trips.mjs`, `tripStops.mjs`, `tripUsers.mjs`. Référence : `routes/v3/messages.mjs` (10 routes migrées).
-- Même idée pour la pagination des listes : `buildNextCursor(items, limit, fields)` (`utils/pagination.mjs`) remplace le bloc `items.length === limit ? buildCursor({...}) : null` — candidats : `events.mjs` (`['_id', 'startDate']`), `polls.mjs` (`['_id']`), `goods.mjs` (attention : `._id.toString()` appliqué avant sérialisation).
+- Migrations opportunistes restantes (prélude manuel `resolveEncodedTripId` + `getTrip` + garde, à remplacer au passage quand on touche le fichier) : `routes/v3/goods.mjs`, `links.mjs`, `polls.mjs`, `trips.mjs`, `tripStops.mjs`, `tripUsers.mjs`. Référence : `routes/v3/messages.mjs` (10 routes migrées) et `routes/v3/events.mjs` (migré, VAKAPI-136).
+- Même idée pour la pagination des listes : `buildNextCursor(items, limit, fields)` (`utils/pagination.mjs`) remplace le bloc `items.length === limit ? buildCursor({...}) : null` — candidats restants : `polls.mjs` (`['_id']`), `goods.mjs` (attention : `._id.toString()` appliqué avant sérialisation).
+
+## Compteurs par événement (messages, goods)
+
+- `GET /trips/:tripId/events` et `GET /trips/:tripId/events/:eventId` exposent `messageCount`, `lastMessageAt` et `goodsCount: { total, missing }` (`missing` = goods `checked: false`), **toujours présents, à 0 plutôt qu'absents** : le front n'a pas de cas `undefined`.
+- Calculés à la lecture, volontairement **pas** dénormalisés sur `Event` : un compteur persisté imposerait un dual-write (`createMessage` n'est pas transactionnel) ou `withTransaction` sur chaque envoi de message, et `missing` ne s'incrémente pas (il dépend de `checkGood` / `checkMultipleGoods`). Décision et alternative écartée documentées dans l'issue `[Événements] Exposer le nombre de messages et de goods par événement` (vakeo-expo#136).
+- Montage : `withEventCounts` / `withEventCount` (`eventsService`), **jamais** dans `search` / `getEvent` — la route `PUT` réutilise `getEvent` puis `event.save()`, un objet plat la casserait. Les routes GET sont les seules à décorer.
+- Deux agrégations groupées par page (`$match { trip, event: { $in: ids } }` + `$group`), pas une requête par événement. `event: { $in: ids }` exclut de fait le canal général (`event: null`).
+- `toObject()` avant fusion : affecter un champ hors schéma sur un document mongoose est ignoré en mode strict, la valeur ne sortirait jamais en JSON.
+- Index : `Good` porte désormais `{ trip: 1, event: 1 }` (le modèle n'avait **aucun** index) ; `Message` était déjà couvert par `{ trip, event, createdAt }`.
+- Partie pure (fusion des deux jeux de résultats, forme à zéro) dans `utils/eventCounts.mjs` + test : la seule partie du chemin testable sans DB.
+- Le non-lu reste hors périmètre : déjà servi par `GET /trips/:tripId/conversations` (`unreadCount`), et par siège donc jamais persistable.
 
 ## encodedId persiste sur Trip (fix duplications)
 
@@ -109,4 +120,5 @@ Notes de contexte pour travailler sur l'API v3. Fichier maintenu à la main — 
 - Lancer `node scripts/backfillEncodedIds.mjs` en prod apres le deploy (les appels tokens auto-guerissent le reste opportunistement).
 - Vérification manuelle en conditions réelles : transactions tripStops (créations concurrentes à 49 stops), batch hydrate.
 - Pas de test couvrant le curseur des messages contre une vraie query (service mocké).
+- Compteurs par événement : les deux agrégations de `eventsService` ne sont pas testées contre une vraie query (helpers purs testés, routes mockées) — vérification manuelle attendue sur un trip avec plusieurs événements.
 - UserAccount (comptes) : non prévu court terme ; si introduit, revoir `GET /`-like et `requireSeatOwnership`.
