@@ -48,6 +48,11 @@ const contentReportSchema = new mongoose.Schema({
         required: true
     },
     // Denormalised so the moderation queue never joins on the subject.
+    // `ref` here is a populate() hint only: MongoDB has no foreign keys and no
+    // cascade semantics, and deleting a trip cascades to nothing in this
+    // codebase (Trip.deleteTrip is a plain findByIdAndDelete). A report outlives
+    // its trip and its subject on purpose — subjectText is the snapshot that
+    // keeps the trail readable once the origin is gone.
     trip: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Trip",

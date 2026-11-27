@@ -10,6 +10,10 @@ const app = express();
 // The public surface takes unauthenticated reports, so the limit is the only
 // brake on a flood — tighter than the geocode/link-preview limits. The
 // authenticated channel stays deduped per seat by the report index.
+// Default keying on req.ip is correct here: `trust proxy` is set once, globally,
+// from TRUST_PROXY_HOPS (index.mjs) before any router is mounted, so the limiter
+// sees the real client IP behind the reverse proxy. Don't key on a raw header,
+// a client could then pick its own bucket.
 const reportLimiter = rateLimit({
     windowMs: 60 * 1000,
     limit: 5,

@@ -84,8 +84,14 @@ const SUBJECTS = {
 };
 
 function joinText(...parts) {
-    return parts.filter(Boolean).join(" · ").slice(0, SUBJECT_TEXT_MAX_LENGTH);
+    return parts.filter(Boolean).join(" · ");
 }
+
+// Extractors read raw schema fields, whose maxlength can drift above the report
+// cap (Link has none at all) and legacy documents can predate it. Cap once, here,
+// so no extractor has to remember it: a snapshot that overflows would fail
+// validation and surface as a 500 instead of a stored report.
+const capSubjectText = (text) => (text ?? "").slice(0, SUBJECT_TEXT_MAX_LENGTH);
 
 const assertValidSubjectType = (subjectType) => {
     if (!CONTENT_REPORT_SUBJECTS.includes(subjectType))
@@ -134,7 +140,7 @@ const loadSubject = async (subjectType, subjectId, tripId = null) => {
             return null;
         if (tripId && String(trip._id) !== String(tripId))
             return null;
-        return { doc: trip, trip: trip._id, subjectText: subject.text(trip), owners: subject.owners(trip) };
+        return { doc: trip, trip: trip._id, subjectText: capSubjectText(subject.text(trip)), owners: subject.owners(trip) };
     }
 
     if (subjectType === "tripUser") {
@@ -148,14 +154,14 @@ const loadSubject = async (subjectType, subjectId, tripId = null) => {
         const seat = await subject.model.findOne({ _id: subjectId }, subject.projection);
         if (!seat)
             return null;
-        return { doc: seat, trip: tripId, subjectText: subject.text(seat), owners: subject.owners(seat) };
+        return { doc: seat, trip: tripId, subjectText: capSubjectText(subject.text(seat)), owners: subject.owners(seat) };
     }
 
     const filter = { _id: subjectId, ...(tripId ? { trip: tripId } : {}) };
     const doc = await subject.model.findOne(filter, subject.projection);
     if (!doc)
         return null;
-    return { doc, trip: tripId ?? doc.trip, subjectText: subject.text(doc), owners: subject.owners(doc) };
+    return { doc, trip: tripId ?? doc.trip, subjectText: capSubjectText(subject.text(doc)), owners: subject.owners(doc) };
 };
 
 const buildReport = ({ subjectType, subjectId, trip, reporter, reason, comment, subjectText }) => ({
@@ -189,23 +195,30 @@ export const reportContent = async (tripId, reporterId, { subjectType, subjectId
     if (subject.owners.some((owner) => String(owner) === String(reporterId)))
         throw new ForbiddenError("You cannot report your own content");
 
+    const payload = buildReport({
+        subjectType,
+        subjectId: subject.doc._id,
+        trip: subject.trip,
+        reporter: reporterId,
+        reason,
+        comment: normalizedComment,
+        subjectText: subject.subjectText
+    });
+
     try {
-        const report = await ContentReport.create(buildReport({
-            subjectType,
-            subjectId: subject.doc._id,
-            trip: subject.trip,
-            reporter: reporterId,
-            reason,
-            comment: normalizedComment,
-            subjectText: subject.subjectText
-        }));
-        return { report, alreadyReported: false };
+        return { report: await ContentReport.create(payload), alreadyReported: false };
     } catch (error) {
         if (error?.code !== 11000)
             throw error;
         // Unique (subject, reporter) index tripped: the report already exists.
         const existing = await ContentReport.findOne({ subjectType, subjectId: subject.doc._id, reporter: reporterId });
-        return { report: existing, alreadyReported: true };
+        if (existing)
+            return { report: existing, alreadyReported: true };
+        // The conflicting row was deleted between the insert and this read: retry
+        // the insert rather than answering 200 with a null report. If the
+        // duplicate trips a second time, that error surfaces instead of a fake
+        // success — the client can retry, which the idempotency makes safe.
+        return { report: await ContentReport.create(payload), alreadyReported: false };
     }
 };
 

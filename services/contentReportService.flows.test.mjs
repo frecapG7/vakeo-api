@@ -144,6 +144,38 @@ describe("contentReportService — seat channel", () => {
         expect(mockContentReport.create.mock.calls[0][0].subjectText).toHaveLength(500);
     });
 
+    test("the cap also applies to extractors that read a raw field", async () => {
+        // A poll question is bounded by its own maxlength, but the snapshot must
+        // not depend on that holding (or on legacy documents honouring it).
+        mockPoll.findOne.mockResolvedValueOnce({ _id: SUBJECT_ID, question: "?".repeat(600), createdBy: "author1" });
+        mockContentReport.create.mockResolvedValueOnce({ _id: "report1" });
+
+        await reportContent("trip123", "member1", { subjectType: "poll", subjectId: SUBJECT_ID, reason: "spam" });
+        expect(mockContentReport.create.mock.calls[0][0].subjectText).toHaveLength(500);
+    });
+
+    test("a duplicate whose conflicting row vanished is retried, not returned as null", async () => {
+        mockMessage.findOne.mockResolvedValueOnce({ _id: SUBJECT_ID, text: "spam", user: "author1" });
+        mockContentReport.create.mockRejectedValueOnce(Object.assign(new Error("duplicate key"), { code: 11000 }));
+        mockContentReport.findOne.mockResolvedValueOnce(null);
+        mockContentReport.create.mockResolvedValueOnce({ _id: "report2", reason: "spam" });
+
+        const result = await reportContent("trip123", "member1", { subjectType: "message", subjectId: SUBJECT_ID, reason: "spam" });
+
+        expect(result).toEqual({ report: { _id: "report2", reason: "spam" }, alreadyReported: false });
+        expect(mockContentReport.create).toHaveBeenCalledTimes(2);
+    });
+
+    test("a retry that hits the duplicate again surfaces the error, never a fake success", async () => {
+        mockMessage.findOne.mockResolvedValueOnce({ _id: SUBJECT_ID, text: "spam", user: "author1" });
+        mockContentReport.create.mockRejectedValueOnce(Object.assign(new Error("duplicate key"), { code: 11000 }));
+        mockContentReport.findOne.mockResolvedValueOnce(null);
+        mockContentReport.create.mockRejectedValueOnce(Object.assign(new Error("duplicate key"), { code: 11000 }));
+
+        await expect(reportContent("trip123", "member1", { subjectType: "message", subjectId: SUBJECT_ID, reason: "spam" }))
+            .rejects.toThrow("duplicate key");
+    });
+
     test("unknown subject surfaces 404", async () => {
         mockMessage.findOne.mockResolvedValueOnce(null);
 
