@@ -51,4 +51,7 @@ const goodSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
+// Covers the per-event counts (eventsService) and the `event` filter of the goods list.
+goodSchema.index({ trip: 1, event: 1 });
+
 export default mongoose.model("Good", goodSchema);
